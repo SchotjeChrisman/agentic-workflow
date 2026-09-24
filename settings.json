@@ -86,6 +86,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/rtk.sh\""
+          }
+        ]
+      }
     ]
   },
   "tui": "fullscreen",
