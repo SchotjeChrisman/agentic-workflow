@@ -11,3 +11,5 @@
 !hooks/*.sh
 !rules/
 !rules/*.md
+!.claude/
+!.claude/CLAUDE.md
