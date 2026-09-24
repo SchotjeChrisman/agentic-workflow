@@ -18,7 +18,9 @@
   },
   "enabledPlugins": {
     "ponytail@ponytail": true,
-    "context7@claude-plugins-official": true
+    "context7@claude-plugins-official": true,
+    "claude-security@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "ponytail": {
