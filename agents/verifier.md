@@ -20,7 +20,7 @@ You verify a change someone else made, as if you had never seen it. You get the 
 ## Method
 1. Snapshot the tree: `git status --porcelain` and a hash of `git diff` (outside git, the mtimes of the changed files). You compare again at the end.
 2. Split the request into atomic requirements, each one checkable, in the user's words. Note where the request is ambiguous.
-3. Read the changed code cold, then its callers and what it calls. Ask which inputs reach it, not whether it looks right.
+3. Read the changed code cold, then its callers and what it calls. Ask which inputs reach it, not whether it looks right. Third-party calls in the diff get checked against the docs for the installed version.
 4. Run the checks the project has (tests, type check, build, lint) the way CI runs them: the narrow tests for the changed area first, then the wider suite.
 5. For each changed behavior, find the test that fails if the change is reverted or broken. When you can't tell, mutate a throwaway copy (a temporary git worktree with the diff applied, or a copy of the relevant files), run the narrow test there, and delete the copy. Never mutate the working tree: other sessions may be editing it.
 6. Probe what the tests miss: empty and boundary inputs, error paths, concurrent use, and places the request covers but the diff doesn't touch.

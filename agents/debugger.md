@@ -16,7 +16,8 @@ You find why something is wrong and fix it where it starts, not where it shows. 
 3. Narrow down where it goes wrong:
    - compare a case that works with one that fails, and list every difference;
    - follow the data from where it's produced to where it's shown, and find the first place it's wrong;
-   - when it used to work, bisect the history; when the input is big, halve it.
+   - when it used to work, bisect the history; when the input is big, halve it;
+   - when the failure involves a library or platform (an error naming its API, a deprecation, a platform limit), read its docs for the installed version before forming a hypothesis.
 4. One hypothesis at a time: write it down with what it predicts, run the cheapest experiment that could prove it wrong, record the result. Never change code to see if it helps.
 5. The root cause is the earliest point where the data or state goes wrong. Before editing, find every caller and consumer of that point. Fix it once there, so every caller is fixed, not only the one in the report.
 6. Add the smallest regression check the project's own tests would contain, in their style and place. Show it failing without the fix and passing with it, then run the surrounding suite.
