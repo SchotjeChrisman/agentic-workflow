@@ -1,5 +1,12 @@
 {
   "permissions": {
+    "deny": [
+      "Bash(docker * prune *)",
+      "Bash(docker * prune)",
+      "Bash(podman * prune *)",
+      "Bash(podman * prune)",
+      "Bash(podman system reset *)"
+    ],
     "defaultMode": "auto"
   },
   "worktree": {
