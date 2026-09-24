@@ -1,9 +1,13 @@
-# Deny by default: this directory becomes ~/.claude, which holds credentials, transcripts, memory and
-# personal settings. Only the files listed below are published; everything else, new files included, stays out.
+# Deny by default: ~/.claude links to this repo, so only the files listed below are published;
+# everything else, new files included, stays out.
 *
 !.gitignore
+!CLAUDE.md
 !settings.json
+!statusline-command.sh
 !agents/
 !agents/*.md
 !hooks/
 !hooks/*.sh
+!rules/
+!rules/*.md
