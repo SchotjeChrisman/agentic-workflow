@@ -1,0 +1,8 @@
+# Deny by default: this directory becomes ~/.claude, which holds credentials, transcripts, memory and
+# personal settings. Only the files listed below are published; everything else, new files included, stays out.
+*
+!.gitignore
+!agents/
+!agents/*.md
+!hooks/
+!hooks/*.sh
