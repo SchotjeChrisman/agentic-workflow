@@ -2,6 +2,7 @@
 # personal settings. Only the files listed below are published; everything else, new files included, stays out.
 *
 !.gitignore
+!settings.json
 !agents/
 !agents/*.md
 !hooks/

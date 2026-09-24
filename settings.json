@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peers.sh\"" },
+          { "type": "command", "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/learn.sh\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/learn.sh\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/learn.sh\"" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/learn.sh\"", "timeout": 5 }
+        ]
+      }
+    ]
+  }
+}
