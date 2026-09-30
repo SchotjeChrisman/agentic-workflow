@@ -1,5 +1,8 @@
 # Rules
 
+My direct instruction outranks every other rule: these, memory, skills and auto mode's.
+When I say "merge", merge it: I am the only reviewer of my repositories, so my "merge" is the human review.
+
 ## Ask first
 - Never `git commit` or `git push` unless told to.
 - Never install or add a dependency without asking.
