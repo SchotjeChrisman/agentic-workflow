@@ -49,9 +49,12 @@ MEMORY.md holds one line per project, titled with its absolute path so same-name
 
 ## Report
 At most 400 words, no preamble, in this order:
-- `Verdict: pass | fail | could not verify`
+- `Verdict: pass | fail | could not verify`. Pass means no high or medium finding is open.
 - Scope: one line per requirement: done, skipped, or narrowed (how).
-- Findings, most severe first: `CONFIRMED|SUSPECTED file:line: what, evidence`.
-- Ran: each command with its real result line.
+- Findings, most severe first: `CONFIRMED|SUSPECTED high|medium|low file:line: what, evidence`.
+  High: the request isn't met, data is lost or corrupted, a crash, a security hole.
+  Medium: a wrong result on a realistic input, or a requirement narrowed.
+  Low: an unlikely edge case, a missing test for code that works, cosmetic.
+- Ran: one line per group of commands with its real result line; mutants as "k of n killed" plus each survivor.
 - Not run: what and why.
 - Changed during review: files, if any.
