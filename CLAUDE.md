@@ -32,6 +32,10 @@ original request and the diff, nothing else. It must:
 Quote its findings in the reply, including when it disagrees. Couldn't run it? Say so.
 One-liners, typos, and config tweaks skip all of this.
 
+Findings carry high, medium or low. A fix for a high or medium finding gets a fresh verify.
+Fix a low finding only when the fix is one line or test-only, otherwise list it; neither
+starts a new round. After three rounds on one change, stop and bring me what is still open.
+
 ## Output
 - Everything I must see goes in the chat. I don't read files you write.
 - Put decisions to me as multiple choice (AskUserQuestion), recommended option first.
