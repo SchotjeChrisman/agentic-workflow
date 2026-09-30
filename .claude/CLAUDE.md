@@ -12,6 +12,7 @@ This repo is the published half of the user's Claude Code config. `~/.claude/{CL
   jq -e 'has("autoMode") | not' settings.json
   ```
   Never add `autoMode` to the allowlist. A hook added only to the repo's `settings.json` doesn't run until it is merged into `~/.claude/settings.json`.
+  The live file's `env.CLAUDE_CODE_TMPDIR=/home/claude/.cache` keeps session scratchpads (verifier build copies included) off the RAM-backed `/tmp`; Claude Code sweeps each with its transcript after 30 days. It is machine-specific, so `env` stays out of the export too.
 - `.gitignore` is deny-by-default: a new file outside the `agents/*.md`, `hooks/*.sh` and `rules/*.md` globs stays unpublished until it gets a `!` line there.
 
 ## Tests
@@ -29,7 +30,7 @@ Runtime deps: bash, jq, git, awk, diffutils, GNU coreutils (`realpath -m`), util
 
 ## hooks/learn.sh
 One script behind four hook events in `settings.json`, dispatched on `hook_event_name`, plus two subcommands:
-- SessionStart injects `~/.claude/USER.md`. PostToolUse on Write|Edit blocks with a "consolidate" reason once USER.md or a MEMORY.md (project auto memory or agent memory) passes its char cap; the write has already landed. Stop nudges "anything worth keeping?" after long turns, never in headless (`sdk-*` entrypoint) runs or plan mode. Caps and thresholds are the constants at the top.
+- SessionStart injects `~/.claude/USER.md`. PostToolUse on Write|Edit blocks with a "consolidate" reason once USER.md, a MEMORY.md (project auto memory or agent memory) or an agent memory topic file passes its char cap; the write has already landed. Stop blocks with the same reason when USER.md or the project's MEMORY.md is over cap, changed since the session's last Stop (marker `learn/<session>.stop`) and is named in one of that session's tool calls since then. That catches Bash writes, including those made answering the reminder, without making other live sessions consolidate a shared file. Otherwise Stop nudges "anything worth keeping?" after long turns, sending project workflows to the main checkout's `.claude/skills/` and cross-project ones to `~/.claude/skills/`; never in headless (`sdk-*` entrypoint) runs or plan mode. Caps and thresholds are the constants at the top; USER.md gets compacted when full, never a bigger cap.
 - SessionEnd, after enough tool calls since the last review, digests the transcript and starts `learn.sh review` detached with `setsid -f`. The review stages copies of USER.md, the project's memory dir (keyed by git common dir) and the user's own skills in a temp dir, lets a restricted headless `claude -p` edit them there, and `apply` copies back only what passes (no symlinks, no `skills/synced/`, nothing changed live meanwhile, nothing over cap, no skill gaining `hooks` or `allowed-tools`). Per-session offsets and `learn.log` live in `~/.claude/learn/`.
 - `learn.sh guard` is not in `settings.json`: it is the PreToolUse hook in the frontmatter of the read-only agents (verifier, critic, auditor), allowing Write/Edit only inside the agent's own memory dir and exiting 2 otherwise. The frontmatter's `|| exit 2` makes a missing script deny too.
 - `LEARN_HOME` moves the script's data (USER.md, memory, skills, `learn/`) to a sandbox for trial runs.
