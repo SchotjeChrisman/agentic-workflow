@@ -179,4 +179,46 @@ nudge "$dir/wt" | grep -qF "in $dir/re.po/.claude/skills/ when it only applies" 
 nudge "$dir/proj" | grep -qF "for this directory only goes in your auto memory" || fail "no auto memory route outside git"
 ! nudge "$dir/proj" | grep -qF "when it only applies to this project" || fail "project skill path outside git"
 
+# Stop has the session that wrote an over-cap USER.md or project MEMORY.md consolidate it, and no other session.
+ts() { date -u -d "$1" +%FT%T.000Z; }
+prompt() { echo "{\"type\":\"user\",\"promptId\":\"$1\",\"timestamp\":\"$(ts "$2")\",\"message\":{\"content\":\"do it\"}}"; }
+append() { echo "{\"type\":\"assistant\",\"timestamp\":\"$(ts "$1")\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"echo x >> $2\"}}]}}"; }
+{ prompt p1 '-60 sec'; append '-50 sec' "$cfg/USER.md"; } >"$t"
+cstop() { run "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\",\"prompt_id\":\"p1\",\"cwd\":\"$1\",\"permission_mode\":\"${2:-auto}\",\"stop_hook_active\":${3:-false}}"; }
+xs 1376 >"$cfg/USER.md"
+cstop "$dir/proj" | jq -e '.decision == "block" and (.reason | test("USER.md is 1376/1375"))' >/dev/null || fail "no Stop block for USER.md over its cap"
+[ -z "$(cstop "$dir/proj" plan)" ] || fail "cap block in plan mode"
+[ -z "$(cstop "$dir/proj" auto true)" ] || fail "cap block while stop_hook_active"
+touch -d '-2 hours' "$cfg/USER.md"
+[ -z "$(cstop "$dir/proj")" ] || fail "cap block for a USER.md changed before this turn"
+echo "{\"type\":\"user\",\"promptId\":\"p1\",\"timestamp\":\"$(ts '+60 sec')\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"content\":\"x\"}]}}" >>"$t"
+touch -d '-30 sec' "$cfg/USER.md"
+cstop "$dir/proj" | jq -e '.decision == "block"' >/dev/null || fail "turn start not taken from the turn's first entry"
+{ prompt p1 '-60 sec'; append '-50 sec' "$dir/proj/notes.md"; } >"$t"; xs 1376 >"$cfg/USER.md"
+[ -z "$(cstop "$dir/proj")" ] || fail "cap block for a USER.md this session never named (another session wrote it)"
+{ prompt p1 '-60 sec'; append '-90 sec' "$cfg/USER.md"; } >"$t"
+[ -z "$(cstop "$dir/proj")" ] || fail "cap block for a USER.md named only before this turn"
+echo "- prefers tabs" >"$cfg/USER.md"
+{ prompt p1 '-60 sec'; append '-50 sec' "~/.claude/projects/${memdir#"$cfg"/projects/}/MEMORY.md"; } >"$t"
+xs 2201 >"$memdir/MEMORY.md"
+cstop "$dir/re.po/sub" | jq -e '.decision == "block" and (.reason | test("memory/MEMORY.md is 2201/2200"))' >/dev/null ||
+  fail "no Stop block for the project's MEMORY.md"
+{ prompt p1 '-60 sec'; echo "{\"type\":\"assistant\",\"timestamp\":\"$(ts '-50 sec')\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Edit\",\"input\":{\"file_path\":\"$memdir/MEMORY.md\"}}]}}"; } >"$t"
+cstop "$dir/re.po/sub" | jq -e '.decision == "block"' >/dev/null || fail "an Edit's file_path doesn't count as naming the file"
+xs 2200 >"$memdir/MEMORY.md"
+[ -z "$(cstop "$dir/re.po/sub")" ] || fail "Stop cap block at 2200 chars"
+echo '{"type":"user","promptId":"p9","message":{"content":"no timestamp"}}' >"$t"; xs 2201 >"$memdir/MEMORY.md"
+[ -z "$(cstop "$dir/re.po/sub")" ] || fail "cap block for a turn not in the transcript"
+
+# A write made while answering the reminder (a stop_hook_active continuation) is caught at the next turn's Stop.
+sstop() { run "{\"hook_event_name\":\"Stop\",\"session_id\":\"s7\",\"transcript_path\":\"$t\",\"prompt_id\":\"$1\",\"cwd\":\"$dir/re.po/sub\",\"stop_hook_active\":${2:-false}}"; }
+{ prompt p1 '-60 sec'; append '-15 sec' "$memdir/MEMORY.md"; prompt p2 '+60 sec'; } >"$t"
+xs 100 >"$memdir/MEMORY.md"
+[ -z "$(sstop p1)" ] && [ -e "$cfg/learn/s7.stop" ] || fail "Stop left no marker"
+touch -d '-20 sec' "$cfg/learn/s7.stop"; xs 2201 >"$memdir/MEMORY.md"; touch -d '-15 sec' "$memdir/MEMORY.md"
+[ -z "$(sstop p1 true)" ] || fail "cap block while stop_hook_active"
+sstop p2 | jq -e '.decision == "block"' >/dev/null || fail "write made answering the reminder not caught next turn"
+touch -d '-1 hour' "$memdir/MEMORY.md"
+[ -z "$(sstop p2)" ] || fail "cap block for a file unchanged since the last Stop"
+
 echo PASS

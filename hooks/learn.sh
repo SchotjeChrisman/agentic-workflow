@@ -20,7 +20,7 @@ $(cat "$user_md")"
 }
 
 # Hermes rejects an over-cap memory write; here the write lands and Claude is told to consolidate at once.
-# ponytail: memory written through Bash skips this, add a FileChanged hook if that happens.
+# Writes through Bash skip this hook; stop() catches them at the end of the turn.
 cap_for() {
   case $1 in
     "$user_md") echo "$USER_CAP" ;;
@@ -63,13 +63,43 @@ worth_nudging() {
     | .message.content[]? | select(.type == "tool_result")] | length' <"$1")" -ge "$NUDGE_AFTER" ]
 }
 
+# Epoch second turn $2 started: the timestamp of its first entry in transcript $1.
+turn_start() {
+  local ts
+  ts=$(jq -Rrn --arg p "$2" 'first(inputs | fromjson? | select(.promptId == $p) | .timestamp) // empty' <"$1")
+  [ -n "$ts" ] && date -d "$ts" +%s
+}
+
+# Does transcript $1 name file $3 in a tool call at or after epoch second $2? Keyed on its path under the config dir
+# minus "projects/", so absolute, ~ and $HOME spellings all match.
+touched() {
+  local key=${3#"$cfg"/}
+  jq -Rn --arg k "${key#projects/}" --argjson t "$2" 'any(inputs | fromjson? | select(.type == "assistant")
+    | select(((.timestamp // "") | sub("\\.[0-9]+"; "") | (fromdateiso8601? // 0)) >= $t)
+    | .message.content[]? | select(.type == "tool_use") | .input | (.file_path // .command // "") | strings; contains($k))' <"$1" |
+    grep -qx true
+}
+
 stop() {
   # Headless runs (claude -p, SDK) return their last message as the result; a reminder turn would replace it.
   case ${CLAUDE_CODE_ENTRYPOINT:-} in sdk-*) return 0 ;; esac
   [ "$(field .permission_mode)" = plan ] || [ "$(field .stop_hook_active)" = true ] && return 0
-  local transcript prompt cwd root where
-  transcript=$(field .transcript_path) prompt=$(field .prompt_id) cwd=$(field .cwd)
-  [ -f "$transcript" ] && [ -n "$prompt" ] && worth_nudging "$transcript" "$prompt" || return 0
+  local transcript prompt cwd sid mark since f root where
+  transcript=$(field .transcript_path) prompt=$(field .prompt_id) cwd=$(field .cwd) sid=$(field .session_id)
+  [ -f "$transcript" ] && [ -n "$prompt" ] || return 0
+  # An over-cap file is consolidated only by a session that wrote it since its own last Stop (it changed since, and a
+  # tool call in this transcript names it), not by every live session sharing it. Since the last Stop, not this turn:
+  # writes made answering the reminder happen in a stop_hook_active continuation, which returns above, so they are
+  # caught at the end of the next turn.
+  # ponytail: a read that names the file also counts and a write by relative path doesn't; parse commands if that bites.
+  mark=${sid:+$state/$sid.stop}
+  if [ -n "$mark" ] && [ -e "$mark" ]; then since=$(stat -c %Y -- "$mark"); else since=$(turn_start "$transcript" "$prompt"); fi
+  [ -z "$mark" ] || { mkdir -p "$state" && touch -- "$mark"; }
+  for f in "$user_md" "$(memdir_for "$cwd")/MEMORY.md"; do
+    over_cap "$f" && [ -n "$since" ] && [ "$(stat -c %Y -- "$f")" -ge "$since" ] && touched "$transcript" "$since" "$f" &&
+      { cap_block "$f"; return 0; }
+  done
+  worth_nudging "$transcript" "$prompt" || return 0
   if root=$(repo_root "$cwd"); then
     where="in $root/.claude/skills/ when it only applies to this project or its stack, in $cfg/skills/ when it holds across projects"
   else
