@@ -67,12 +67,17 @@ stop() {
   # Headless runs (claude -p, SDK) return their last message as the result; a reminder turn would replace it.
   case ${CLAUDE_CODE_ENTRYPOINT:-} in sdk-*) return 0 ;; esac
   [ "$(field .permission_mode)" = plan ] || [ "$(field .stop_hook_active)" = true ] && return 0
-  local transcript prompt
-  transcript=$(field .transcript_path) prompt=$(field .prompt_id)
+  local transcript prompt cwd root where
+  transcript=$(field .transcript_path) prompt=$(field .prompt_id) cwd=$(field .cwd)
   [ -f "$transcript" ] && [ -n "$prompt" ] && worth_nudging "$transcript" "$prompt" || return 0
+  if root=$(repo_root "$cwd"); then
+    where="in $root/.claude/skills/ when it only applies to this project or its stack, in $cfg/skills/ when it holds across projects"
+  else
+    where="in $cfg/skills/ when it holds across projects; a workflow for this directory only goes in your auto memory"
+  fi
   context Stop "This turn took many tool calls. Before finishing, decide whether any of it is worth keeping for future sessions:
-- A multi-step workflow you worked out, a workaround for an error, or a correction from the user: patch the matching skill in $cfg/skills/, or create $cfg/skills/<name>/SKILL.md. Prefer patching; merge overlapping skills. Never edit a symlinked skill or anything under $cfg/skills/synced/; copy it to a new name first.
-- A fact about the user that holds across projects: add it to $user_md, one line per entry, $USER_CAP chars at most.
+- A multi-step workflow you worked out, a workaround for an error, or a correction from the user: patch the matching skill or create <name>/SKILL.md, $where. Prefer patching; merge overlapping skills. Never edit a symlinked skill or anything under $cfg/skills/synced/; copy it to a new name first.
+- A fact about the user that holds across projects: add it to $user_md, one line per entry, $USER_CAP chars at most. When it is full, compact it to make room (merge and shorten entries, drop what CLAUDE.md or rules already say); never skip a fact for lack of room, and never raise the cap.
 - A fact about this project that the code and git history don't show: your auto memory.
 If nothing qualifies, end your turn without writing anything more."
 }
@@ -102,11 +107,18 @@ digest() {
     else empty end'
 }
 
+# Root of the main worktree of the git repo around $1, so files put there outlive a linked worktree.
+repo_root() {
+  local root
+  root=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  echo "${root%/.git}"
+}
+
 # Auto memory dir for a project: keyed by the git root (main worktree), else the directory itself.
 # ponytail: paths over 200 chars (hashed by Claude Code), autoMemoryDirectory and submodules aren't handled.
 memdir_for() {
   local root
-  root=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && root=${root%/.git} || root=$1
+  root=$(repo_root "$1") || root=$1
   echo "$cfg/projects/$(printf %s "$root" | LC_ALL=C tr -c 'a-zA-Z0-9' -)/memory"
 }
 
@@ -136,14 +148,14 @@ You are reviewing a finished Claude Code session to improve future sessions. It 
 Work only on the files in your working directory, by relative path. They are copies of:
 - USER.md: notes about the user that hold across all projects. One line per entry, $USER_CAP characters at most in total.
 - memory/: this project's memory. memory/MEMORY.md is the index loaded into every session, one line per memory ("- [Title](file.md) — one-line hook"), $MEMORY_CAP characters at most in total. Each memory is its own file with name, description and metadata.type (user, feedback, project or reference) frontmatter.
-- skills/<name>/SKILL.md: the user's own skills, with name and description frontmatter.
+- skills/<name>/SKILL.md: the user's own global skills, loaded in every project, with name and description frontmatter.
 
 Files present:
 $(find . -type f | sort)
 
 Change them only where the session taught something reusable:
-- A multi-step workflow worked out, a workaround for an error, or a correction from the user: patch the matching skill, or create skills/<name>/SKILL.md. Prefer patching; merge overlapping skills.
-- A fact about the user that holds across projects: USER.md.
+- A multi-step workflow worked out, a workaround for an error, or a correction from the user, when it holds across projects: patch the matching skill, or create skills/<name>/SKILL.md. Prefer patching; merge overlapping skills. One tied to this project or its stack: leave it, the session keeps those in its repo.
+- A fact about the user that holds across projects: USER.md. When it won't fit, compact USER.md to make room (merge and shorten entries); never skip the fact, and never raise the cap.
 - A fact about this project that the code and git history don't show: a memory file plus its line in memory/MEMORY.md.
 - Already recorded: leave it. Contradicted or stale: fix it, or delete the file by writing it empty.
 Files over their size limit are discarded, and so are skills that add hooks or allowed-tools to their frontmatter.

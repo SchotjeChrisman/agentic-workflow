@@ -169,4 +169,14 @@ stop | jq -e '.hookSpecificOutput.additionalContext | test("worth keeping")' >/d
 { turn p0 20; turn p1 14; } >"$t"
 [ -z "$(stop)" ] || fail "reminder after 14 tool calls (earlier turns must not count)"
 
+# The reminder files project workflows in the main checkout's .claude/skills/, and outside git in auto memory.
+{ echo '{"type":"user","promptId":"p1","message":{"content":"do it"}}'; turn p1 16; } >"$t"
+nudge() { run "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\",\"prompt_id\":\"p1\",\"cwd\":\"$1\"}" | jq -r '.hookSpecificOutput.additionalContext'; }
+nudge "$dir/re.po/sub" | grep -qF "in $dir/re.po/.claude/skills/ when it only applies" || fail "no project skill path in a repo"
+git -C "$dir/re.po" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+git -C "$dir/re.po" worktree add -q "$dir/wt"
+nudge "$dir/wt" | grep -qF "in $dir/re.po/.claude/skills/ when it only applies" || fail "worktree reminder doesn't name the main checkout"
+nudge "$dir/proj" | grep -qF "for this directory only goes in your auto memory" || fail "no auto memory route outside git"
+! nudge "$dir/proj" | grep -qF "when it only applies to this project" || fail "project skill path outside git"
+
 echo PASS
