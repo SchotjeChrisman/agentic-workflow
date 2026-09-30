@@ -7,7 +7,7 @@
 cfg=${LEARN_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}
 state=$cfg/learn
 user_md=$cfg/USER.md
-MEMORY_CAP=2200 USER_CAP=1375 NUDGE_AFTER=15 REVIEW_AFTER=30 REVIEW_MODEL=sonnet
+MEMORY_CAP=2200 USER_CAP=1375 TOPIC_CAP=12000 NUDGE_AFTER=15 REVIEW_AFTER=30 REVIEW_MODEL=sonnet
 
 field() { jq -r "$1 // empty" <<<"$input"; }
 chars() { if [ -f "$1" ]; then LC_ALL=C.UTF-8 wc -m <"$1"; else echo 0; fi; }
@@ -21,20 +21,23 @@ $(cat "$user_md")"
 
 # Hermes rejects an over-cap memory write; here the write lands and Claude is told to consolidate at once.
 # ponytail: memory written through Bash skips this, add a FileChanged hook if that happens.
-post_tool_use() {
-  local file cap n
-  file=$(field .tool_input.file_path)
-  case $file in
-    "$user_md") cap=$USER_CAP ;;
-    "$cfg"/projects/*/memory/MEMORY.md) cap=$MEMORY_CAP ;;
-    */agent-memory/*/MEMORY.md | */agent-memory-local/*/MEMORY.md) cap=$MEMORY_CAP ;;
-    *) return 0 ;;
+cap_for() {
+  case $1 in
+    "$user_md") echo "$USER_CAP" ;;
+    "$cfg"/projects/*/memory/MEMORY.md) echo "$MEMORY_CAP" ;;
+    */agent-memory/*/MEMORY.md | */agent-memory-local/*/MEMORY.md) echo "$MEMORY_CAP" ;;
+    */agent-memory/*/*.md | */agent-memory-local/*/*.md) echo "$TOPIC_CAP" ;;
+    *) return 1 ;;
   esac
-  n=$(chars "$file")
-  [ "$n" -gt "$cap" ] || return 0
-  jq -n --arg r "$file is $n/$cap chars, over its cap. Consolidate it now: merge related entries, shorten, drop stale ones, move detail into topic files." \
+}
+
+over_cap() { local cap; cap=$(cap_for "$1") && [ "$(chars "$1")" -gt "$cap" ]; }
+cap_block() {
+  jq -n --arg r "$1 is $(chars "$1")/$(cap_for "$1") chars, over its cap. Consolidate it now: merge related entries, shorten, drop stale ones and what CLAUDE.md or rules already say. An index moves detail into topic files." \
     '{decision: "block", reason: $r}'
 }
+
+post_tool_use() { local f; f=$(field .tool_input.file_path); over_cap "$f" && cap_block "$f"; }
 
 # A read-only agent may use Write/Edit only inside its own memory dir: user scope under the config dir, or
 # project/local scope under the session's cwd. Denies with exit 2 (so a missing jq denies too), and the frontmatter

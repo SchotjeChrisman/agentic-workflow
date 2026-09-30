@@ -46,6 +46,12 @@ xs 9999 >"$dir/proj/MEMORY.md"; [ -z "$(post "$dir/proj/MEMORY.md")" ] || fail "
 amem=$cfg/agent-memory/verifier; mkdir -p "$amem"
 xs 2200 >"$amem/MEMORY.md"; [ -z "$(post "$amem/MEMORY.md")" ] || fail "agent memory cap fired at 2200 chars"
 xs 2201 >"$amem/MEMORY.md"; post "$amem/MEMORY.md" | jq -e '.decision == "block"' >/dev/null || fail "no block over the agent MEMORY.md cap"
+xs 12000 >"$amem/topic.md"; [ -z "$(post "$amem/topic.md")" ] || fail "agent topic cap fired at 12000 chars"
+xs 12001 >"$amem/topic.md"; post "$amem/topic.md" | jq -e '.decision == "block"' >/dev/null || fail "no block over the agent topic cap"
+lmem=$dir/proj/.claude/agent-memory-local/verifier; mkdir -p "$lmem"
+xs 12001 >"$lmem/topic.md"; post "$lmem/topic.md" | jq -e '.decision == "block"' >/dev/null || fail "no block over the local agent topic cap"
+xs 20000 >"$cfg/projects/-p/memory/topic.md"; [ -z "$(post "$cfg/projects/-p/memory/topic.md")" ] || fail "cap fired on a project topic file"
+rm -f "$amem/topic.md" "$lmem/topic.md" "$cfg/projects/-p/memory/topic.md"
 echo "- prefers tabs" >"$cfg/USER.md"
 
 # `learn.sh guard` (read-only agents' PreToolUse) allows Write/Edit only in the agent's own memory dir, and
