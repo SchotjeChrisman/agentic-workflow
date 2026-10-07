@@ -3,6 +3,7 @@
 *
 !.gitignore
 !CLAUDE.md
+!LICENSE
 !settings.json
 !statusline-command.sh
 !agents/
