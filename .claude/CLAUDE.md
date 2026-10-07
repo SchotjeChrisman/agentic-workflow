@@ -26,7 +26,9 @@ Each prints `PASS` or exits at the first `FAIL: <reason>`; there is no per-case 
 
 The statusline reads Claude Code's statusLine JSON on stdin: `echo '{"model":{"display_name":"M"},"workspace":{"current_dir":"'$PWD'"}}' | bash statusline-command.sh`.
 
-Runtime deps: bash, jq, git, awk, diffutils, GNU coreutils (`realpath -m`), util-linux (`setsid`, `flock`), python3 (statusline), the `claude` CLI (reviewer), and optionally rtk (`rtk.sh` does nothing without it).
+Runtime deps: bash 3.2+, jq 1.7+ (1.6 mishandles `first(...) // empty`), git, awk, diffutils, python3 (statusline, and learn.sh's detach and lock), the `claude` CLI (reviewer), and optionally rtk (`rtk.sh` does nothing without it).
+
+The scripts run on Linux, macOS and the BSDs: keep them to bash 3.2 (macOS's `/bin/bash`, so no `mapfile` or `${x,,}`) and to flags GNU and BSD tools share. Where they differ, try one form and fall back to the other, as `mtime` in learn.sh and `fmt_epoch` in the statusline do.
 
 ## hooks/learn.sh
 One script behind four hook events in `settings.json`, dispatched on `hook_event_name`, plus two subcommands:
