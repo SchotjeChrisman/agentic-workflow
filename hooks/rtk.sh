@@ -8,14 +8,18 @@ input=$(cat)
 command -v rtk >/dev/null && command -v jq >/dev/null || exit 0
 field() { jq -r "$1 // empty" <<<"$input"; }
 [ -z "$(field .agent_id)" ] || exit 0
-cmd=$(sed -z 's/\\\n/ /g' <<<"$(field .tool_input.command)" | tr -s '[:space:]' ' ') cwd=$(field .cwd)
+cmd=$(field .tool_input.command) cwd=$(field .cwd)
+cmd=${cmd//\\$'\n'/ }
+cmd=$(tr -s '[:space:]' ' ' <<<"$cmd")
 # Project files load from the start dir, the repo root and, in a worktree, the main checkout; reading extra ones only skips more.
-mapfile -t roots < <(git -C "$cwd" rev-parse --path-format=absolute --show-toplevel --git-common-dir 2>/dev/null)
+roots=()
+while IFS= read -r d; do roots+=("$d"); done < <(git -C "$cwd" rev-parse --path-format=absolute --show-toplevel --git-common-dir 2>/dev/null)
 files=("${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json")
 for d in "${CLAUDE_PROJECT_DIR:-$cwd}" "$cwd" "${roots[@]%/.git}"; do files+=("$d/.claude/settings.json" "$d/.claude/settings.local.json"); done
 guarded=("git diff" "git show" "git * diff" "git * show" "git * -p" "git * --patch" "gh * diff")
 for f in "${files[@]}"; do
-  [ -f "$f" ] && mapfile -t -O "${#guarded[@]}" guarded < <(jq -r '.permissions? | (.ask // [])[], (.deny // [])[]
+  [ -f "$f" ] || continue
+  while IFS= read -r g; do guarded+=("$g"); done < <(jq -r '.permissions? | (.ask // [])[], (.deny // [])[]
     | select(startswith("Bash(")) | .[5:-1] | sub("(:| )\\*$"; "")' "$f" 2>/dev/null)
 done
 # A substring match is a superset of Claude Code's per-subcommand match, wrappers and chains included.
