@@ -106,8 +106,10 @@ repo_part="${DIM}repo${RESET} ${BOLD}${repo_full}${RESET}"
 [ -n "$branch" ] && repo_part="$repo_part · ${DIM}branch${RESET} ${BOLD}${branch}${RESET}"
 [ -n "$worktree" ] && repo_part="$repo_part · ${DIM}worktree${RESET} ${BOLD}${worktree}${RESET}"
 
-# ponytail: $HOME must be quoted — bash 5.3 treats its slashes as pattern/replacement separators
-loc="${cwd/#"$HOME"/\~}"
+# ponytail: $HOME must be quoted — bash 5.3 treats its slashes as pattern/replacement separators;
+# the ~ comes from a variable because bash 3.2 (macOS) keeps the backslash of a literal \~
+tilde='~'
+loc="${cwd/#"$HOME"/$tilde}"
 loc_part="${DIM}${loc}${RESET}"
 
 model_part="${loc_part} · ${BOLD}${model}${RESET}"
