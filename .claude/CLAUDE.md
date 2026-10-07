@@ -11,7 +11,7 @@ This repo is the published half of the user's Claude Code config. `~/.claude/{CL
   jq '{permissions, worktree, statusLine, enabledPlugins, extraKnownMarketplaces, modelSettings, attribution, hooks, tui, theme, skipWorkflowUsageWarning, preferredNotifChannel, remoteControlAtStartup, inputNeededNotifEnabled, agentPushNotifEnabled} | with_entries(select(.value != null))' ~/.claude/settings.json > settings.json
   jq -e 'has("autoMode") | not' settings.json
   ```
-  Never add `autoMode` to the allowlist. A hook added only to the repo's `settings.json` doesn't run until it is merged into `~/.claude/settings.json`.
+  Never add `autoMode` to the allowlist, and never run the export on the user's work Mac: there `enabledPlugins` and `extraKnownMarketplaces` hold the employer's plugins and private marketplace, and this repo is public. A hook added only to the repo's `settings.json` doesn't run until it is merged into `~/.claude/settings.json`.
   The live file's `env.CLAUDE_CODE_TMPDIR=/home/claude/.cache` keeps session scratchpads (verifier build copies included) off the RAM-backed `/tmp`; Claude Code sweeps each with its transcript after 30 days. It is machine-specific, so `env` stays out of the export too.
 - `.gitignore` is deny-by-default: a new file outside the `agents/*.md`, `hooks/*.sh` and `rules/*.md` globs stays unpublished until it gets a `!` line there.
 
