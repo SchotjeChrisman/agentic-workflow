@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Self-check for learn.sh: each hook event on fake transcripts, and the reviewer against a stub claude.
 set -e
-dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
+dir=$(mktemp -d); dir=$(cd "$dir" && pwd -P); trap 'rm -rf "$dir"' EXIT
 learn=$(cd "$(dirname "$0")" && pwd)/learn.sh
 unset LEARN_HOME
 export CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CONFIG_DIR=$dir/cfg PATH=$dir/bin:$PATH STUB=$dir/stub
@@ -14,7 +14,7 @@ run() {
   printf '%s' "$out"
 }
 waitfor() { for _ in $(seq 50); do [ -e "$1" ] && return; sleep 0.1; done; fail "$2"; }
-xs() { head -c "$1" /dev/zero | tr '\0' x; }
+xs() { printf "%$1s" | tr ' ' x; }
 turn() { # turn <prompt_id> <n>: n tool calls answered within that prompt
   for i in $(seq "$2"); do
     echo '{"type":"assistant","promptId":null,"message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/x"}}]}}'
@@ -25,7 +25,7 @@ turn() { # turn <prompt_id> <n>: n tool calls answered within that prompt
 # Stub claude: records args and stdin, sleeps STUB_SLEEP, then runs STUB_EDIT inside the stage.
 cat >"$dir/bin/claude" <<'EOF'
 #!/usr/bin/env bash
-cat >"$STUB.stdin"; printf '%s\n' "$@" >"$STUB.args"
+cat >"$STUB.stdin"; python3 -c 'import os; print(os.getsid(0))' >"$STUB.sid"; printf '%s\n' "$@" >"$STUB.args"
 sleep "${STUB_SLEEP:-0}"; [ -z "$STUB_EDIT" ] || bash -c "$STUB_EDIT"
 EOF
 chmod +x "$dir/bin/claude"
@@ -61,14 +61,15 @@ guard() { local rc=0; gin "$1" "$2" | bash "$learn" guard 2>/dev/null || rc=$?; 
 for ok in "$amem/MEMORY.md" "$dir/proj/.claude/agent-memory-local/verifier/x.md" "$dir/proj/.claude/agent-memory/verifier/x.md"; do
   [ "$(guard verifier "$ok")" = 0 ] || fail "guard denied $ok"
 done
-ln -s "$dir/proj" "$amem/link"
-for bad in "$dir/proj/app.py" "$amem/../../x" "$amem/link/app.py" "$cfg/agent-memory/critic/x.md" \
+ln -s "$dir/proj" "$amem/link"; touch "$dir/proj/app.py"; ln -s "$dir/proj/app.py" "$amem/flink"; ln -s "$dir/proj/none" "$amem/dangle"
+for bad in "$dir/proj/app.py" "$amem/../../x" "$amem/new/../../../proj/app.py" "$amem/link/app.py" "$amem/flink" "$amem/dangle" \
+  "$cfg/agent-memory/critic/x.md" \
   "$dir/proj/src/agent-memory/verifier/x.py" "$dir/proj/src/.claude/agent-memory-local/verifier/x.py" \
   "$cfg/agent-memory/critic/agent-memory/verifier/x.md" "agent-memory/verifier/rel.md" ""; do
   [ "$(guard verifier "$bad")" = 2 ] || fail "guard allowed '$bad'"
 done
 [ "$(guard "" "$amem/x.md")" = 2 ] || fail "guard allowed a write without agent_type"
-mkdir "$dir/nojq"; ln -s "$(command -v cat)" "$(command -v realpath)" "$dir/nojq/"
+mkdir "$dir/nojq"; ln -s "$(command -v cat)" "$dir/nojq/"
 rc=0; gin verifier "$amem/x.md" | PATH=$dir/nojq "$(command -v bash)" "$learn" guard 2>/dev/null || rc=$?
 [ "$rc" = 2 ] || fail "guard without jq exited $rc"
 hook=$(sed -n "s/^ *command: '\(.*\)'$/\1/p" "$(dirname "$learn")/../agents/verifier.md")
@@ -97,6 +98,7 @@ start=$SECONDS
 STUB_SLEEP=3 end s1 "$t" "$dir/proj" >/dev/null
 [ $((SECONDS - start)) -lt 2 ] || fail "SessionEnd waited for the reviewer"
 waitfor "$STUB.args" "reviewer never ran"
+[ "$(cat "$STUB.sid")" != "$(python3 -c 'import os; print(os.getsid(0))')" ] || fail "reviewer not in its own session"
 for want in "FIRST PROMPT" "USER: [image]" "[Request interrupted by user]" "MIDTURN FIX" "ARRAY ERROR" "CLAUDE SAYS" "TOOL: Read /x"; do
   grep -qF "$want" "$STUB.stdin" || fail "digest lacks: $want"
 done
@@ -136,7 +138,7 @@ export LIVE=$live
 STUB_EDIT='
   echo "- new fact" >>USER.md
   : >memory/b.md
-  xs() { head -c "$1" /dev/zero | tr "\0" x; }; xs 2201 >memory/MEMORY.md
+  printf "%2201s" | tr " " x >memory/MEMORY.md
   echo changed >memory/a.md; echo peer >"$LIVE/a.md"
   echo patched >skills/mine/SKILL.md
   mkdir -p skills/evil skills/synced/x skills/vendor
@@ -156,6 +158,12 @@ grep -q patched "$cfg/skills/mine/SKILL.md" || fail "own skill patch not applied
 [ ! -e "$cfg/notes.md" ] && [ ! -e "$cfg/skills/notes.md" ] || fail "stray file applied"
 [ "$(grep -c '^rejected' "$dir/review.log")" -eq 6 ] || fail "expected 6 rejections: $(cat "$dir/review.log")"
 
+# A review waits while another holds the lock.
+rm -f "$STUB.args"; exec 8>"$cfg/learn/lock"; python3 -c 'import fcntl; fcntl.flock(8, fcntl.LOCK_EX)'
+bash "$learn" review "$(mktemp)" "$live" s10 /proj >/dev/null 2>&1 8>&- & sleep 1
+[ ! -e "$STUB.args" ] || fail "review ran while another held the lock"
+exec 8>&-; wait; [ -e "$STUB.args" ] || fail "review never ran once the lock was free"
+
 # Stop reminds after long turns only, never while planning or already continuing.
 t=$dir/stop.jsonl
 stop() { run "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\",\"prompt_id\":\"p1\",\"permission_mode\":\"${1:-auto}\",\"stop_hook_active\":${2:-false}}"; }
@@ -164,7 +172,8 @@ stop() { run "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\",\"prompt_
 [ -z "$(stop auto true)" ] || fail "reminder while stop_hook_active"
 [ -z "$(CLAUDE_CODE_ENTRYPOINT=sdk-cli stop)" ] || fail "reminder in a headless run"
 [ -z "$(run '{"hook_event_name":"Stop","prompt_id":"p1"}')" ] || fail "output without a transcript"
-[ -z "$(run "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\"}")" ] || fail "output without a prompt_id"
+j="{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\"}"
+[ -z "$(run "$j")" ] || fail "output without a prompt_id"
 stop | jq -e '.hookSpecificOutput.additionalContext | test("worth keeping")' >/dev/null || fail "no reminder after 16 tool calls"
 { turn p0 20; turn p1 14; } >"$t"
 [ -z "$(stop)" ] || fail "reminder after 14 tool calls (earlier turns must not count)"
@@ -180,30 +189,31 @@ nudge "$dir/proj" | grep -qF "for this directory only goes in your auto memory" 
 ! nudge "$dir/proj" | grep -qF "when it only applies to this project" || fail "project skill path outside git"
 
 # Stop has the session that wrote an over-cap USER.md or project MEMORY.md consolidate it, and no other session.
-ts() { date -u -d "$1" +%FT%T.000Z; }
+ts() { jq -nr --argjson o "$1" 'now + $o | floor | todate | sub("Z$"; ".000Z")'; }
+age() { touch -t "$(jq -nr --argjson o "$1" 'now + $o | strflocaltime("%Y%m%d%H%M.%S")')" "$2"; }
 prompt() { echo "{\"type\":\"user\",\"promptId\":\"$1\",\"timestamp\":\"$(ts "$2")\",\"message\":{\"content\":\"do it\"}}"; }
 append() { echo "{\"type\":\"assistant\",\"timestamp\":\"$(ts "$1")\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"echo x >> $2\"}}]}}"; }
-{ prompt p1 '-60 sec'; append '-50 sec' "$cfg/USER.md"; } >"$t"
+{ prompt p1 -60; append -50 "$cfg/USER.md"; } >"$t"
 cstop() { run "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$t\",\"prompt_id\":\"p1\",\"cwd\":\"$1\",\"permission_mode\":\"${2:-auto}\",\"stop_hook_active\":${3:-false}}"; }
 xs 1376 >"$cfg/USER.md"
 cstop "$dir/proj" | jq -e '.decision == "block" and (.reason | test("USER.md is 1376/1375"))' >/dev/null || fail "no Stop block for USER.md over its cap"
 [ -z "$(cstop "$dir/proj" plan)" ] || fail "cap block in plan mode"
 [ -z "$(cstop "$dir/proj" auto true)" ] || fail "cap block while stop_hook_active"
-touch -d '-2 hours' "$cfg/USER.md"
+age -7200 "$cfg/USER.md"
 [ -z "$(cstop "$dir/proj")" ] || fail "cap block for a USER.md changed before this turn"
-echo "{\"type\":\"user\",\"promptId\":\"p1\",\"timestamp\":\"$(ts '+60 sec')\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"content\":\"x\"}]}}" >>"$t"
-touch -d '-30 sec' "$cfg/USER.md"
+echo "{\"type\":\"user\",\"promptId\":\"p1\",\"timestamp\":\"$(ts 60)\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"content\":\"x\"}]}}" >>"$t"
+age -30 "$cfg/USER.md"
 cstop "$dir/proj" | jq -e '.decision == "block"' >/dev/null || fail "turn start not taken from the turn's first entry"
-{ prompt p1 '-60 sec'; append '-50 sec' "$dir/proj/notes.md"; } >"$t"; xs 1376 >"$cfg/USER.md"
+{ prompt p1 -60; append -50 "$dir/proj/notes.md"; } >"$t"; xs 1376 >"$cfg/USER.md"
 [ -z "$(cstop "$dir/proj")" ] || fail "cap block for a USER.md this session never named (another session wrote it)"
-{ prompt p1 '-60 sec'; append '-90 sec' "$cfg/USER.md"; } >"$t"
+{ prompt p1 -60; append -90 "$cfg/USER.md"; } >"$t"
 [ -z "$(cstop "$dir/proj")" ] || fail "cap block for a USER.md named only before this turn"
 echo "- prefers tabs" >"$cfg/USER.md"
-{ prompt p1 '-60 sec'; append '-50 sec' "~/.claude/projects/${memdir#"$cfg"/projects/}/MEMORY.md"; } >"$t"
+{ prompt p1 -60; append -50 "~/.claude/projects/${memdir#"$cfg"/projects/}/MEMORY.md"; } >"$t"
 xs 2201 >"$memdir/MEMORY.md"
 cstop "$dir/re.po/sub" | jq -e '.decision == "block" and (.reason | test("memory/MEMORY.md is 2201/2200"))' >/dev/null ||
   fail "no Stop block for the project's MEMORY.md"
-{ prompt p1 '-60 sec'; echo "{\"type\":\"assistant\",\"timestamp\":\"$(ts '-50 sec')\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Edit\",\"input\":{\"file_path\":\"$memdir/MEMORY.md\"}}]}}"; } >"$t"
+{ prompt p1 -60; echo "{\"type\":\"assistant\",\"timestamp\":\"$(ts -50)\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Edit\",\"input\":{\"file_path\":\"$memdir/MEMORY.md\"}}]}}"; } >"$t"
 cstop "$dir/re.po/sub" | jq -e '.decision == "block"' >/dev/null || fail "an Edit's file_path doesn't count as naming the file"
 xs 2200 >"$memdir/MEMORY.md"
 [ -z "$(cstop "$dir/re.po/sub")" ] || fail "Stop cap block at 2200 chars"
@@ -212,13 +222,13 @@ echo '{"type":"user","promptId":"p9","message":{"content":"no timestamp"}}' >"$t
 
 # A write made while answering the reminder (a stop_hook_active continuation) is caught at the next turn's Stop.
 sstop() { run "{\"hook_event_name\":\"Stop\",\"session_id\":\"s7\",\"transcript_path\":\"$t\",\"prompt_id\":\"$1\",\"cwd\":\"$dir/re.po/sub\",\"stop_hook_active\":${2:-false}}"; }
-{ prompt p1 '-60 sec'; append '-15 sec' "$memdir/MEMORY.md"; prompt p2 '+60 sec'; } >"$t"
+{ prompt p1 -60; append -15 "$memdir/MEMORY.md"; prompt p2 60; } >"$t"
 xs 100 >"$memdir/MEMORY.md"
 [ -z "$(sstop p1)" ] && [ -e "$cfg/learn/s7.stop" ] || fail "Stop left no marker"
-touch -d '-20 sec' "$cfg/learn/s7.stop"; xs 2201 >"$memdir/MEMORY.md"; touch -d '-15 sec' "$memdir/MEMORY.md"
+age -20 "$cfg/learn/s7.stop"; xs 2201 >"$memdir/MEMORY.md"; age -15 "$memdir/MEMORY.md"
 [ -z "$(sstop p1 true)" ] || fail "cap block while stop_hook_active"
 sstop p2 | jq -e '.decision == "block"' >/dev/null || fail "write made answering the reminder not caught next turn"
-touch -d '-1 hour' "$memdir/MEMORY.md"
+age -3600 "$memdir/MEMORY.md"
 [ -z "$(sstop p2)" ] || fail "cap block for a file unchanged since the last Stop"
 
 echo PASS

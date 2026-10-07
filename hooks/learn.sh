@@ -10,7 +10,9 @@ user_md=$cfg/USER.md
 MEMORY_CAP=2200 USER_CAP=1375 TOPIC_CAP=12000 NUDGE_AFTER=15 REVIEW_AFTER=30 REVIEW_MODEL=sonnet
 
 field() { jq -r "$1 // empty" <<<"$input"; }
-chars() { if [ -f "$1" ]; then LC_ALL=C.UTF-8 wc -m <"$1"; else echo 0; fi; }
+chars() { if [ -f "$1" ]; then jq -Rs length <"$1"; else echo 0; fi; }
+# GNU stat, then BSD (macOS, *BSD).
+mtime() { stat -c %Y -- "$1" 2>/dev/null || stat -f %m -- "$1"; }
 context() { jq -n --arg e "$1" --arg c "$2" '{hookSpecificOutput: {hookEventName: $e, additionalContext: $c}}'; }
 
 session_start() {
@@ -39,6 +41,20 @@ cap_block() {
 
 post_tool_use() { local f; f=$(field .tool_input.file_path); over_cap "$f" && cap_block "$f"; }
 
+# Portable `realpath -m` for the guard: resolves symlinks in the part of absolute path $1 that exists and appends the
+# rest. Fails, so the guard denies, on a relative path, a . or .. component, or a symlink right after the existing part
+# (one to a file, or a dangling one).
+resolve() {
+  local dir=$1 tail= first
+  case $1 in /*) ;; *) return 1 ;; esac
+  case /$1/ in */./* | */../*) return 1 ;; esac
+  while [ -n "$dir" ] && [ ! -d "$dir" ]; do tail=/${dir##*/}$tail dir=${dir%/*}; done
+  first=${tail#/} first=${first%%/*}
+  [ -z "$first" ] || [ ! -L "$dir/$first" ] || return 1
+  dir=$(cd -P -- "${dir:-/}" && pwd -P) || return 1
+  echo "${dir%/}$tail"
+}
+
 # A read-only agent may use Write/Edit only inside its own memory dir: user scope under the config dir, or
 # project/local scope under the session's cwd. Denies with exit 2 (so a missing jq denies too), and the frontmatter
 # adds `|| exit 2` so a missing script denies as well.
@@ -46,8 +62,8 @@ post_tool_use() { local f; f=$(field .tool_input.file_path); over_cap "$f" && ca
 guard() {
   local t conf root
   t=$(field .agent_type)
-  conf=$(realpath -m -- "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" 2>/dev/null) root=$(realpath -m -- "$(field .cwd)" 2>/dev/null)
-  case $(realpath -m -- "$(field .tool_input.file_path)" 2>/dev/null) in
+  conf=$(resolve "${CLAUDE_CONFIG_DIR:-$HOME/.claude}") root=$(resolve "$(field .cwd)")
+  case $(resolve "$(field .tool_input.file_path)") in
     "$conf/agent-memory/$t"/* | "$root/.claude/agent-memory/$t"/* | "$root/.claude/agent-memory-local/$t"/*) return 0 ;;
   esac
   echo "You are a read-only agent: Write and Edit work only inside your own memory directory." >&2
@@ -65,9 +81,8 @@ worth_nudging() {
 
 # Epoch second turn $2 started: the timestamp of its first entry in transcript $1.
 turn_start() {
-  local ts
-  ts=$(jq -Rrn --arg p "$2" 'first(inputs | fromjson? | select(.promptId == $p) | .timestamp) // empty' <"$1")
-  [ -n "$ts" ] && date -d "$ts" +%s
+  jq -Rrn --arg p "$2" 'first(inputs | fromjson? | select(.promptId == $p) | .timestamp) // empty
+    | sub("\\.[0-9]+"; "") | fromdateiso8601?' <"$1"
 }
 
 # Does transcript $1 name file $3 in a tool call at or after epoch second $2? Keyed on its path under the config dir
@@ -93,10 +108,10 @@ stop() {
   # caught at the end of the next turn.
   # ponytail: a read that names the file also counts and a write by relative path doesn't; parse commands if that bites.
   mark=${sid:+$state/$sid.stop}
-  if [ -n "$mark" ] && [ -e "$mark" ]; then since=$(stat -c %Y -- "$mark"); else since=$(turn_start "$transcript" "$prompt"); fi
+  if [ -n "$mark" ] && [ -e "$mark" ]; then since=$(mtime "$mark"); else since=$(turn_start "$transcript" "$prompt"); fi
   [ -z "$mark" ] || { mkdir -p "$state" && touch -- "$mark"; }
   for f in "$user_md" "$(memdir_for "$cwd")/MEMORY.md"; do
-    over_cap "$f" && [ -n "$since" ] && [ "$(stat -c %Y -- "$f")" -ge "$since" ] && touched "$transcript" "$since" "$f" &&
+    over_cap "$f" && [ -n "$since" ] && [ "$(mtime "$f")" -ge "$since" ] && touched "$transcript" "$since" "$f" &&
       { cap_block "$f"; return 0; }
   done
   worth_nudging "$transcript" "$prompt" || return 0
@@ -167,8 +182,10 @@ session_end() {
   # ponytail: keeps the last 60KB, chunked summaries if reviews miss what long sessions learned early.
   tail -n +"$((seen + 1))" "$transcript" | digest | tail -c 60000 >"$digest"
   echo "$total" >"$state/$sid"
-  # Every fd redirected here, or the detached job holds the hook's stdout open until it finishes.
-  setsid -f bash "${BASH_SOURCE[0]}" review "$digest" "$(memdir_for "$cwd")" "$sid" "$cwd" </dev/null >>"$state/learn.log" 2>&1
+  # Every fd redirected here, or the detached job holds the hook's stdout open until it finishes. Python forks and
+  # calls setsid, as `setsid -f` does where util-linux exists.
+  python3 -c 'import os, sys; os.fork() and sys.exit(); os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' \
+    bash "${BASH_SOURCE[0]}" review "$digest" "$(memdir_for "$cwd")" "$sid" "$cwd" </dev/null >>"$state/learn.log" 2>&1
 }
 
 review_prompt() {
@@ -235,8 +252,9 @@ review() {
   mkdir -p "$state"
   work=$(mktemp -d)
   trap 'rm -rf "$work" "$digest"' EXIT
-  exec 9>"$state/lock" && flock 9
-  echo "== $(date -Is) session $3 in $4"
+  # The lock stays held by this shell's fd 9 after python exits, as with `flock 9`.
+  exec 9>"$state/lock" && python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'
+  echo "== $(date +%Y-%m-%dT%H:%M:%S%z) session $3 in $4"
   mkdir -p "$work/orig/memory" "$work/orig/skills"
   [ -f "$user_md" ] && cp -- "$user_md" "$work/orig/USER.md"
   [ -d "$memdir" ] && cp -R -- "$memdir/." "$work/orig/memory/"
