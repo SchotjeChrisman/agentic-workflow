@@ -121,7 +121,7 @@ stop() {
     where="in $cfg/skills/ when it holds across projects; a workflow for this directory only goes in your auto memory"
   fi
   context Stop "This turn took many tool calls. Before finishing, decide whether any of it is worth keeping for future sessions:
-- A multi-step workflow you worked out, a workaround for an error, or a correction from the user: patch the matching skill or create <name>/SKILL.md, $where. Prefer patching; merge overlapping skills. Never edit a symlinked skill or anything under $cfg/skills/synced/; copy it to a new name first.
+- A multi-step workflow you worked out, a workaround for an error, or a correction from the user: patch the matching skill or create <name>/SKILL.md, $where. Prefer patching; merge overlapping skills. Never edit a symlinked skill or anything under $cfg/skills/synced/; copy it to a new name first. Never edit a plugin's skill (named <plugin>:<skill>), since plugin updates replace it: put the lesson in a skill of your own that holds only the addition (\"when using <plugin>:<skill>, also ...\").
 - A fact about the user that holds across projects: add it to $user_md, one line per entry, $USER_CAP chars at most. When it is full, compact it to make room (merge and shorten entries, drop what CLAUDE.md or rules already say); never skip a fact for lack of room, and never raise the cap.
 - A fact about this project that the code and git history don't show: your auto memory.
 If nothing qualifies, end your turn without writing anything more."
@@ -201,7 +201,7 @@ Files present:
 $(find . -type f | sort)
 
 Change them only where the session taught something reusable:
-- A multi-step workflow worked out, a workaround for an error, or a correction from the user, when it holds across projects: patch the matching skill, or create skills/<name>/SKILL.md. Prefer patching; merge overlapping skills. One tied to this project or its stack: leave it, the session keeps those in its repo.
+- A multi-step workflow worked out, a workaround for an error, or a correction from the user, when it holds across projects: patch the matching skill, or create skills/<name>/SKILL.md. Prefer patching; merge overlapping skills. One tied to this project or its stack: leave it, the session keeps those in its repo. A lesson about a plugin's skill (named <plugin>:<skill>) goes in a skill of your own that holds only the addition.
 - A fact about the user that holds across projects: USER.md. When it won't fit, compact USER.md to make room (merge and shorten entries); never skip the fact, and never raise the cap.
 - A fact about this project that the code and git history don't show: a memory file plus its line in memory/MEMORY.md.
 - Already recorded: leave it. Contradicted or stale: fix it, or delete the file by writing it empty.
