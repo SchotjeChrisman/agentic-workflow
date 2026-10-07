@@ -19,5 +19,5 @@ for bad in "me (" elsewhere dead; do ! grep -q "$bad" <<<"$out" || { echo "FAIL:
 out=$(run "$dir/other" "$dir/reg")
 grep -q 'elsewhere' <<<"$out" && ! grep -q samedir <<<"$out" || { echo "FAIL: non-repo dir should match exact cwd only"; exit 1; }
 [ -z "$(run "$dir/repo" "$dir/none")" ] || { echo "FAIL: output with no peers"; exit 1; }
-kill $live
+kill $live; wait $live 2>/dev/null || true
 echo PASS
