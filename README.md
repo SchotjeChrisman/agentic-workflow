@@ -2,7 +2,7 @@
 
 # agentic-workflow
 
-**A stack-agnostic Claude Code setup: global rules, four method-driven subagents, self-improving memory hooks and a rate-limit-aware status line.**
+**A stack-agnostic Claude Code setup: global rules, five method-driven subagents, self-improving memory hooks and a rate-limit-aware status line.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20BSD-lightgrey)
@@ -36,6 +36,7 @@ agentic-workflow/
 │   ├── verifier.md         cold check of a finished change
 │   ├── critic.md           stress-tests a plan before it's built
 │   ├── auditor.md          checks docs or data against reality
+│   ├── scraper.md          researches the web and docs on Haiku
 │   └── debugger.md         root-causes and fixes a bug
 ├── hooks/
 │   ├── learn.sh            memory caps, "worth keeping?" nudges, background review
@@ -58,20 +59,22 @@ Your `~/.claude` links to the files in this repo, so a `git pull` updates the ru
 - **Scope:** a plan or brainstorm means build nothing yet; numbered steps are the whole job.
 - **Commits:** small conventional commits, with no AI attribution lines.
 - **Verify before "done":** every non-trivial change gets a fresh verifier subagent, with severity-ranked findings and at most three rounds.
+- **Models:** subagents and workflow stages get Haiku, Sonnet or the session's model by task, and web research goes to the scraper.
 - **Output:** dense plain reports and multiple-choice decisions, with no preamble or emoji.
 
 `rules/context7.md` makes Claude check third-party APIs against current docs through [Context7](https://context7.com) instead of relying on memory.
 
 ### Subagents
 
-Four user-scope agents, each built around a method rather than a stack. Each keeps its own memory per project under `~/.claude/agent-memory/<agent>/`.
+Five user-scope agents, each built around a method rather than a stack. Each keeps its own memory per project under `~/.claude/agent-memory/<agent>/`.
 
-| Agent | Use it for | Edits code? |
-| --- | --- | --- |
-| **verifier** | An independent check of a finished change: re-runs the tests and makes sure nothing in the request was skipped | No |
-| **critic** | Stress-testing a plan: false claims, failure modes, over- and under-built parts, test gaps | No |
-| **auditor** | Checking a document, list or dataset against reality, item by item | No |
-| **debugger** | Finding the root cause of a bug or failing test, then fixing it with a regression check | Yes, never commits |
+| Agent | Use it for | Model | Edits code? |
+| --- | --- | --- | --- |
+| **verifier** | An independent check of a finished change: re-runs the tests and makes sure nothing in the request was skipped | Sonnet | No |
+| **critic** | Stress-testing a plan: false claims, failure modes, over- and under-built parts, test gaps | Session model | No |
+| **auditor** | Checking a document, list or dataset against reality, item by item | Sonnet | No |
+| **scraper** | Web and docs research: returns each fact as a verbatim quote with its URL, so the pages stay out of your context | Haiku | No |
+| **debugger** | Finding the root cause of a bug or failing test, then fixing it with a regression check | Session model | Yes, never commits |
 
 A hook guards the read-only agents: they can write only inside their own memory folder.
 
@@ -191,7 +194,7 @@ cd ~/agentic-workflow && bash hooks/test_learn.sh && bash hooks/test_peers.sh &&
 
 Each test prints `PASS` (`test_rtk.sh` prints `SKIP` without rtk). Then start `claude`:
 - the status line appears at the bottom;
-- `/agents` lists verifier, critic, auditor and debugger;
+- `/agents` lists verifier, critic, auditor, scraper and debugger;
 - `/hooks` shows the hooks.
 
 ## Customizing
