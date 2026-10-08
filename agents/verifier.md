@@ -1,6 +1,8 @@
 ---
 name: verifier
 description: Cold, independent check of a finished non-trivial change, before saying done, fixed or works. Pass the user's original request verbatim and the diff or changed paths (untracked files included), and nothing about why you think it works. Read-only; returns a verdict with evidence. Use proactively.
+model: sonnet
+effort: high
 memory: user
 disallowedTools: Agent, NotebookEdit, mcp__*
 hooks:

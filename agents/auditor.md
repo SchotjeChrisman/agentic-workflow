@@ -1,6 +1,8 @@
 ---
 name: auditor
 description: Checks a document, list or dataset against reality item by item - docs against code, claims against outputs, records against rules. Pass what to audit and the rules to check (or "every checkable claim"). Read-only; reports only the discrepancies, with evidence and a count.
+model: sonnet
+effort: high
 memory: user
 disallowedTools: Agent, NotebookEdit
 hooks:
