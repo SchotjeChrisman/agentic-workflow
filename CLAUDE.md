@@ -36,6 +36,12 @@ Findings carry high, medium or low. A fix for a high or medium finding gets a fr
 Fix a low finding only when the fix is one line or test-only, otherwise list it; neither
 starts a new round. After three rounds on one change, stop and bring me what is still open.
 
+## Models
+Starting a subagent or workflow agent, pass `haiku` for Explore and for scanning, extracting
+or summarizing many items, `sonnet` for per-item review or edits, and no model for plans,
+synthesis and judgment, so it inherits the session's. Web and docs research goes to the
+scraper. Never pass a model to an agent whose definition sets one.
+
 ## Output
 - Everything I must see goes in the chat. I don't read files you write.
 - Put decisions to me as multiple choice (AskUserQuestion), recommended option first.
