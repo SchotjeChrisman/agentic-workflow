@@ -2,18 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This repo is the published half of the user's Claude Code config. `~/.claude/{CLAUDE.md,agents,hooks,rules,statusline-command.sh}` are symlinks into it, so every edit here is live on this machine: hooks and the statusline on their next run, instructions and agents in the next session.
+This repo is the published half of the user's Claude Code config. `~/.claude/{CLAUDE.md,agents,hooks,rules}` are symlinks into it, so every edit here is live on this machine: hooks on their next run, instructions and agents in the next session. The status band (`mods/statusband`) is installed from this clone as a directory marketplace (`statusband@agentic-workflow`), read from the folder itself: `/reload-plugins` picks up an edit.
 
 ## Files that aren't what they look like
 - The root `CLAUDE.md` is the user's global rules (`~/.claude/CLAUDE.md`), loaded in every project. Guidance about this repo goes in this file, never there. `rules/*.md` likewise load as user rules everywhere.
 - `settings.json` is not linked: Claude Code replaces `~/.claude/settings.json` on write, and the live file holds a private `autoMode` block. The repo copy is an allowlisted export; refresh it and check it with:
   ```
-  jq '{permissions, worktree, statusLine, enabledPlugins, extraKnownMarketplaces, modelSettings, attribution, hooks, tui, theme, skipWorkflowUsageWarning, preferredNotifChannel, remoteControlAtStartup, inputNeededNotifEnabled, agentPushNotifEnabled} | with_entries(select(.value != null))' ~/.claude/settings.json > settings.json
+  jq '{permissions, worktree, enabledPlugins, extraKnownMarketplaces, modelSettings, attribution, hooks, tui, theme, skipWorkflowUsageWarning, preferredNotifChannel, remoteControlAtStartup, inputNeededNotifEnabled, agentPushNotifEnabled} | with_entries(select(.value != null))' ~/.claude/settings.json > settings.json
   jq -e 'has("autoMode") | not' settings.json
   ```
   Never add `autoMode` to the allowlist, and never run the export on the user's work Mac: there `enabledPlugins` and `extraKnownMarketplaces` hold the employer's plugins and private marketplace, and this repo is public. A hook added only to the repo's `settings.json` doesn't run until it is merged into `~/.claude/settings.json`.
   The live file's `env.CLAUDE_CODE_TMPDIR=/home/claude/.cache` keeps session scratchpads (verifier build copies included) off the RAM-backed `/tmp`; Claude Code sweeps each with its transcript after 30 days. It is machine-specific, so `env` stays out of the export too.
-- `.gitignore` is deny-by-default: a new file outside the `agents/*.md`, `hooks/*.sh` and `rules/*.md` globs stays unpublished until it gets a `!` line there.
+- `.gitignore` is deny-by-default: a new file outside the `agents/*.md`, `hooks/*.sh`, `rules/*.md` and `mods/statusband/` globs stays unpublished until it gets a `!` line there. `mods/statusband/.claude-plugin/types/` is written by the engine and stays out.
+- The live settings' `extraKnownMarketplaces.agentic-workflow` is a `directory` source with this machine's absolute path; the repo's `settings.json` carries only `enabledPlugins.statusband@agentic-workflow`, and README step 4 adds the marketplace. Drop that path from any export.
 
 ## Tests
 No build or lint step. The tests:
@@ -21,14 +22,14 @@ No build or lint step. The tests:
 bash hooks/test_learn.sh    # ~6s, waits on detached reviewers
 bash hooks/test_peers.sh
 bash hooks/test_rtk.sh      # prints SKIP without rtk
+claude plugin validate mods/statusband
+claude plugin test mods/statusband
 ```
 Each prints `PASS` or exits at the first `FAIL: <reason>`; there is no per-case selection. They sandbox themselves in a mktemp dir (`CLAUDE_CONFIG_DIR`, `CLAUDE_SESSIONS_DIR`, and a stub `claude` on `PATH` that records the reviewer's args and stdin), so they never touch the live config. `test_learn.sh` pulls the guard command out of `agents/verifier.md` with sed, so keep that frontmatter `command: '...'` on one line.
 
-The statusline reads Claude Code's statusLine JSON on stdin: `echo '{"model":{"display_name":"M"},"workspace":{"current_dir":"'$PWD'"}}' | bash statusline-command.sh`.
+Runtime deps: bash 3.2+, jq 1.7+ (1.6 mishandles `first(...) // empty`), git, awk, diffutils, python3 (learn.sh's detach and lock), the `claude` CLI (reviewer), and optionally rtk (`rtk.sh` does nothing without it).
 
-Runtime deps: bash 3.2+, jq 1.7+ (1.6 mishandles `first(...) // empty`), git, awk, diffutils, python3 (statusline, and learn.sh's detach and lock), the `claude` CLI (reviewer), and optionally rtk (`rtk.sh` does nothing without it).
-
-The scripts run on Linux, macOS and the BSDs: keep them to bash 3.2 (macOS's `/bin/bash`, so no `mapfile` or `${x,,}`) and to flags GNU and BSD tools share. Where they differ, try one form and fall back to the other, as `mtime` in learn.sh and `fmt_epoch` in the statusline do.
+The scripts run on Linux, macOS and the BSDs: keep them to bash 3.2 (macOS's `/bin/bash`, so no `mapfile` or `${x,,}`) and to flags GNU and BSD tools share. Where they differ, try one form and fall back to the other, as `mtime` in learn.sh does.
 
 ## hooks/learn.sh
 One script behind four hook events in `settings.json`, dispatched on `hook_event_name`, plus two subcommands:
@@ -43,3 +44,6 @@ One script behind four hook events in `settings.json`, dispatched on `hook_event
 
 ## agents/
 Five user-scope agents built around a method, not a stack. verifier and auditor run on Sonnet and scraper on Haiku, set by `model` and `effort` in their frontmatter; critic and debugger inherit the session model. They share one section layout (Orient, Method, Evidence, Running things, Memory, Report), keep `memory: user` under `~/.claude/agent-memory/<agent>/` with one MEMORY.md line per project titled by absolute path, and cap their report length. Only debugger edits. Because they are live, a trial `claude -p` run that keeps the real config dir (a `LEARN_HOME` sandbox, for one) and uses an agent writes into the real agent memory: afterwards remove that topic file, its MEMORY.md line and the sandbox transcript dirs.
+
+## mods/statusband
+A Claude Code mod (function hooks, early-access API) that draws the status band above the prompt; it replaced the old `statusLine` script. `hooks/register.tsx` holds the hooks and the drawing, `hooks/format.ts` the pure helpers, `types/index.d.ts` the `$.state` contract. Figures come from `session.measure` and `$.session.usage()`, git from `$.process.run` after Bash/worktree tool calls and turn ends. It leaves the permission mode to the engine's footer: a mod can't follow shift+tab (no event fires, and the `PromptHint` text has the mode words cut out). Develop with `claude --plugin-dir mods/statusband`, which lays the API's `.d.ts` in `.claude-plugin/types/` for `tsc -p mods/statusband`; that file is the API reference for the running build.

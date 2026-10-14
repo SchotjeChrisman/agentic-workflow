@@ -12,15 +12,12 @@
   "worktree": {
     "baseRef": "head"
   },
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude/statusline-command.sh"
-  },
   "enabledPlugins": {
     "ponytail@ponytail": true,
     "context7@claude-plugins-official": true,
     "claude-security@claude-plugins-official": true,
-    "plugin-dev@claude-plugins-official": true
+    "plugin-dev@claude-plugins-official": true,
+    "statusband@agentic-workflow": true
   },
   "extraKnownMarketplaces": {
     "ponytail": {

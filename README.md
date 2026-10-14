@@ -2,7 +2,7 @@
 
 # agentic-workflow
 
-**A stack-agnostic Claude Code setup: global rules, five method-driven subagents, self-improving memory hooks and a rate-limit-aware status line.**
+**A stack-agnostic Claude Code setup: global rules, five method-driven subagents, self-improving memory hooks and a rate-limit-aware status band.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20BSD-lightgrey)
@@ -43,11 +43,14 @@ agentic-workflow/
 │   ├── peers.sh            tells Claude about other live sessions in the repo
 │   ├── rtk.sh              optional: compressed command output via rtk
 │   └── test_*.sh           self-checks for each hook
-├── statusline-command.sh   model, repo, context and rate-limit status line
-└── settings.json           permissions, hooks, status line and plugins
+├── mods/
+│   └── statusband/         status band above the prompt (a Claude Code mod)
+├── .claude-plugin/
+│   └── marketplace.json    makes the clone a plugin marketplace for the mod
+└── settings.json           permissions, hooks and plugins
 ```
 
-Your `~/.claude` links to the files in this repo, so a `git pull` updates the rules, agents, hooks and status line at once.
+Your `~/.claude` links to the files in this repo, and Claude Code reads the status band straight from the clone, so a `git pull` updates the rules, agents, hooks and status band at once.
 
 ## Features
 
@@ -90,26 +93,38 @@ A hook guards the read-only agents: they can write only inside their own memory 
 
 **`rtk.sh`: quieter output (optional).** When [rtk](https://github.com/rtk-ai/rtk) is installed, it routes the main session's Bash commands through rtk to compress their output. Diffs, subagent commands, and anything your `ask` or `deny` permission rules name are passed through untouched. Without rtk it does nothing. It assumes auto mode: rewritten read-only commands lose their built-in approval, so outside auto mode they prompt.
 
-### Status line
+### Status band
+
+`mods/statusband` is a Claude Code mod: a band of three rows drawn above the prompt, in place of a `statusLine` script.
 
 ```
-~/projects/app · Opus 5.5 – xhigh
-repo you/app · branch main · worktree fix-login
-Context 23% (1M) · Session 41% (resets 14:30) · Week 12% (resets Mon 09:00)
+ Directory ~/projects/app  ·  󰚩 Model Opus 5.5  ·   Effort xhigh
+ Repository you/app  ·   Branch main  ·  󰙅 Worktree fix-login
+󰍛 Context 23% of 1M  ·  󰔟 Session 41% resets 14:30  ·  󰃭 Week 12% resets Mon 09:00  ·   Cost $1.84
 ```
+
+It runs inside Claude Code, so it updates on events instead of on a snapshot:
+- context, rate limits and cost redraw when Claude Code reports a change, and again after `/clear`;
+- the repository, branch and worktree are re-read after every Bash or worktree tool call and at the end of each turn;
+- the model follows `/model`, the model picker and `/effort`.
+
+The permission mode is left to Claude Code's own footer, which shows it as soon as you press shift+tab. Effort appears after the first request of a session.
 
 The session and week percentages are colored by pace, not by a flat threshold:
 - green while your usage trails the share of the window that has passed;
 - yellow once it gets ahead of that share;
 - red once it is 20 points ahead, or above 90%.
 
+A rate-limit window whose reset time has passed shows "reset, awaiting next reading" until fresh figures arrive. The icons are [Nerd Font](https://www.nerdfonts.com) glyphs.
+
 ### Settings
 
-`settings.json` wires up the hooks and the status line and turns on a few plugins:
+`settings.json` wires up the hooks and turns on a few plugins:
 - [ponytail](https://github.com/DietrichGebert/ponytail)
 - context7
 - claude-security
 - plugin-dev
+- statusband, from this repo
 
 It also:
 - sets auto mode as the default permission mode;
@@ -124,7 +139,7 @@ It also:
 | **OS** | Linux, macOS or a BSD |
 | **Claude Code** | the `claude` CLI |
 | **Tools** | bash 3.2+, jq 1.7+, git, python3, awk, diff |
-| **Optional** | [rtk](https://github.com/rtk-ai/rtk) for compressed output |
+| **Optional** | [rtk](https://github.com/rtk-ai/rtk) for compressed output; a [Nerd Font](https://www.nerdfonts.com) in your terminal for the status band's icons |
 
 On macOS, the Xcode Command Line Tools provide git and python3, and macOS 15 and later ship jq 1.7.
 
@@ -144,7 +159,7 @@ This loop never overwrites anything that's already there:
 
 ```sh
 mkdir -p ~/.claude && cd ~/.claude
-for f in CLAUDE.md agents hooks rules statusline-command.sh; do
+for f in CLAUDE.md agents hooks rules; do
   if [ -e "$f" ] || [ -L "$f" ]; then echo "skipped, already exists: $f"; else ln -s "$HOME/agentic-workflow/$f" "$f"; fi
 done
 ```
@@ -184,7 +199,11 @@ claude plugin install ponytail@ponytail
 claude plugin install context7@claude-plugins-official
 claude plugin install claude-security@claude-plugins-official
 claude plugin install plugin-dev@claude-plugins-official
+claude plugin marketplace add ~/agentic-workflow
+claude plugin install statusband@agentic-workflow
 ```
+
+The last two lines add your clone as a marketplace. Claude Code then reads the status band from `~/agentic-workflow/mods/statusband` itself, not from a copy.
 
 **5. Check it**
 
@@ -193,14 +212,14 @@ cd ~/agentic-workflow && bash hooks/test_learn.sh && bash hooks/test_peers.sh &&
 ```
 
 Each test prints `PASS` (`test_rtk.sh` prints `SKIP` without rtk). Then start `claude`:
-- the status line appears at the bottom;
+- the status band appears above the prompt;
 - `/agents` lists verifier, critic, auditor, scraper and debugger;
 - `/hooks` shows the hooks.
 
 ## Customizing
 
 - **Rules:** `CLAUDE.md` is written in the first person as the author's own rules. Read it, then edit what doesn't fit how you work. Note that your edits land in your clone.
-- **Time zone:** the status line pins reset times to `Europe/Amsterdam`. Change the `TZ` line at the top of `statusline-command.sh`.
+- **Time zone:** the status band pins reset times to `Europe/Amsterdam`. Change `timeZone` in `resetLabel` in `mods/statusband/hooks/format.ts`.
 - **Caps and thresholds:** these are the constants at the top of `hooks/learn.sh` (`USER_CAP`, `MEMORY_CAP`, `NUDGE_AFTER`, `REVIEW_AFTER`, `REVIEW_MODEL`).
 - **Settings:** change values in `~/.claude/settings.json`; rerunning step 3 keeps them. A key you delete there comes back on the next merge, and so does the original of a list entry you edit (a hook, a permission rule). Make those changes in `~/agentic-workflow/settings.json` too.
 - **Auto mode:** if your plan or organization doesn't offer auto mode, change `permissions.defaultMode`.
@@ -212,19 +231,26 @@ Each test prints `PASS` (`test_rtk.sh` prints `SKIP` without rtk). Then start `c
 cd ~/agentic-workflow && git pull
 ```
 
-Rules, agents, hooks and the status line update through the links. When `settings.json` changes, run step 3 again. It adds new entries, but it never removes old ones: if the repo changes or drops a hook or permission rule, the old entry stays next to the new one. Delete it by hand; the diff in step 3 shows both.
+Rules, agents and hooks update through the links. The status band is read from the clone: run `/reload-plugins` in an open session, or start a new one. When `settings.json` changes, run step 3 again. It adds new entries, but it never removes old ones: if the repo changes or drops a hook or permission rule, the old entry stays next to the new one. Delete it by hand; the diff in step 3 shows both.
+
+**Coming from the old status line:** the status line script was replaced by the status band. The merge can't remove old entries, so after pulling:
+- delete the `statusLine` block from `~/.claude/settings.json`;
+- remove the dead link with `rm ~/.claude/statusline-command.sh`;
+- run the last two lines of step 4.
 
 ## Uninstalling
 
 ```sh
+claude plugin uninstall statusband@agentic-workflow
+claude plugin marketplace remove agentic-workflow
 cd ~/.claude
-for f in CLAUDE.md agents hooks rules statusline-command.sh; do
+for f in CLAUDE.md agents hooks rules; do
   [ "$(readlink "$f")" = "$HOME/agentic-workflow/$f" ] && rm "$f"
 done
 mv settings.json.bak settings.json
 ```
 
-This removes only the links that point into the clone, then restores your settings from before the first install. Settings changes made since then are lost.
+This removes the status band and only the links that point into the clone, then restores your settings from before the first install. Settings changes made since then are lost.
 
 The hooks keep their data in:
 - `~/.claude/USER.md`
@@ -241,11 +267,15 @@ The tests run in a temporary sandbox and never touch your live config:
 bash hooks/test_learn.sh
 bash hooks/test_peers.sh
 bash hooks/test_rtk.sh
+claude plugin validate mods/statusband
+claude plugin test mods/statusband
 ```
 
-`test_learn.sh` takes about 6 seconds because it waits on detached reviewers. `test_rtk.sh` prints `SKIP` without rtk.
+`test_learn.sh` takes about 6 seconds because it waits on detached reviewers. `test_rtk.sh` prints `SKIP` without rtk. The status band's tests run on the engine's own test kit, with simulated events and no live session.
 
-The scripts must keep working on Linux, macOS and the BSDs, so:
+To work on the status band, run `claude --plugin-dir mods/statusband` from the clone. That session reloads the mod on every save and lays its type declarations in `mods/statusband/.claude-plugin/types/`, so `tsc -p mods/statusband` type-checks it.
+
+The shell scripts must keep working on Linux, macOS and the BSDs, so:
 - stick to bash 3.2 (no `mapfile`, no `${x,,}`);
 - use only flags that GNU and BSD tools share;
 - where they differ, try one form and fall back to the other.
