@@ -1,0 +1,9 @@
+{
+  "name": "statusband",
+  "version": "0.1.0",
+  "description": "Status band above the prompt: directory, model, repo, context, rate limits and cost",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Chris"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "agentic-workflow",
+  "description": "Mods for the agentic-workflow Claude Code setup",
+  "owner": {
+    "name": "Chris"
+  },
+  "plugins": [
+    {
+      "name": "statusband",
+      "source": "./mods/statusband",
+      "description": "Status band above the prompt: directory, model, repo, context, rate limits and cost"
+    }
+  ]
+}

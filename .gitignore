@@ -6,7 +6,6 @@
 !LICENSE
 !README.md
 !settings.json
-!statusline-command.sh
 !agents/
 !agents/*.md
 !hooks/
@@ -15,3 +14,16 @@
 !rules/*.md
 !.claude/
 !.claude/CLAUDE.md
+!.claude-plugin/
+!.claude-plugin/marketplace.json
+!mods/
+!mods/statusband/
+!mods/statusband/tsconfig.json
+!mods/statusband/.claude-plugin/
+!mods/statusband/.claude-plugin/plugin.json
+!mods/statusband/hooks/
+!mods/statusband/hooks/*
+!mods/statusband/types/
+!mods/statusband/types/*.d.ts
+!mods/statusband/tests/
+!mods/statusband/tests/*.test.ts
