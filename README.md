@@ -60,6 +60,7 @@ Your `~/.claude` links to the files in this repo, and Claude Code reads the stat
 
 - **Ask first:** no commits, pushes, new dependencies or broad cleanups unless told.
 - **Scope:** a plan or brainstorm means build nothing yet; numbered steps are the whole job.
+- **Code:** readable, modular code in the project's own conventions, built to grow without a rewrite but never for features nobody asked for.
 - **Commits:** small conventional commits, with no AI attribution lines.
 - **Verify before "done":** every non-trivial change gets a fresh verifier subagent, with severity-ranked findings and at most three rounds.
 - **Models:** subagents and workflow stages get Haiku, Sonnet or the session's model by task, and web research goes to the scraper.

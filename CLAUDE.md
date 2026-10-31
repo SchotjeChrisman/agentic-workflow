@@ -16,6 +16,26 @@ When I say "merge", merge it: I am the only reviewer of my repositories, so my "
 - Numbered steps from me are the whole scope. Don't widen them or pull in other projects; ask instead.
 - Research queries name the subject, not the answer you expect.
 
+## Code
+Write code the way a senior engineer would, for the next human who reads it. This covers what
+you write or change; code outside the ask stays as it is.
+- Readable first: someone new follows it top to bottom without running it. Names say what a
+  thing is or does, spelled out; booleans read as yes/no questions.
+- One job per function, module and file. A name that needs "and" means split it. Functions stay
+  short enough to read whole; early returns and guard clauses keep nesting shallow.
+- Modular: group by feature, not by kind of file. Modules meet at small explicit interfaces,
+  dependencies point one way, nothing shares mutable globals. I/O, time and randomness stay at
+  the edges and the logic between them pure, so it tests without mocks.
+- Scalable means it grows without a rewrite: clear seams, no hidden coupling, data structures and
+  algorithms that hold at the sizes the data will reach. It never means building for features or
+  load nobody asked for: extract an abstraction at the second or third real use, not the first.
+- The project's conventions, layout, formatter and linter win over taste. New code looks like the
+  code around it.
+- Name a value once instead of repeating a literal. No dead or commented-out code.
+- Handle an error where something can be done about it and let it surface loudly everywhere else;
+  never swallow one. Validate input at trust boundaries and trust it inside.
+- Comments say why, never what. If the what needs a comment, rewrite the code until it doesn't.
+
 ## Commits
 - Commit only this session's own work, in small conventional commits.
 - Never mention Claude, Claude Code, or Anthropic in a commit message, PR body, or branch name.
