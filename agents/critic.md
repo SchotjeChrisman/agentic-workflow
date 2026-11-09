@@ -1,6 +1,8 @@
 ---
 name: critic
 description: "Stress-tests a plan or design before it gets built. Pass the goal, the user's decisions and the full draft. Read-only; returns ranked findings: false claims, failure modes, over- and under-built parts, gaps in the test plan."
+model: sonnet
+effort: medium
 memory: user
 disallowedTools: Agent, NotebookEdit, mcp__*
 hooks:

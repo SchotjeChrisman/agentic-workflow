@@ -75,10 +75,10 @@ Five user-scope agents, each built around a method rather than a stack. Each kee
 | Agent | Use it for | Model | Edits code? |
 | --- | --- | --- | --- |
 | **verifier** | An independent check of a finished change: re-runs the tests and makes sure nothing in the request was skipped | Sonnet | No |
-| **critic** | Stress-testing a plan: false claims, failure modes, over- and under-built parts, test gaps | Session model | No |
+| **critic** | Stress-testing a plan: false claims, failure modes, over- and under-built parts, test gaps | Sonnet | No |
 | **auditor** | Checking a document, list or dataset against reality, item by item | Sonnet | No |
 | **scraper** | Web and docs research: returns each fact as a verbatim quote with its URL, so the pages stay out of your context | Haiku | No |
-| **debugger** | Finding the root cause of a bug or failing test, then fixing it with a regression check | Session model | Yes, never commits |
+| **debugger** | Finding the root cause of a bug or failing test, then fixing it with a regression check | Sonnet | Yes, never commits |
 
 A hook guards the read-only agents: they can write only inside their own memory folder.
 

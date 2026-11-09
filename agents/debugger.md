@@ -1,6 +1,8 @@
 ---
 name: debugger
 description: Finds and fixes the root cause of a bug, error, failing test or wrong output, in any stack. Pass the symptom as the user reported it, where it shows, and any repro you know. Returns the cause with evidence, the fix and a regression check. Never commits.
+model: sonnet
+effort: high
 memory: user
 ---
 
