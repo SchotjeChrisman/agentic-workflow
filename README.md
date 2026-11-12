@@ -38,6 +38,8 @@ agentic-workflow/
 │   ├── auditor.md          checks docs or data against reality
 │   ├── scraper.md          researches the web and docs on Haiku
 │   └── debugger.md         root-causes and fixes a bug
+├── skills/
+│   └── mainstay-blocks/    how a Mainstay site's editor blocks are built and split
 ├── hooks/
 │   ├── learn.sh            memory caps, "worth keeping?" nudges, background review
 │   ├── peers.sh            tells Claude about other live sessions in the repo
@@ -81,6 +83,10 @@ Five user-scope agents, each built around a method rather than a stack. Each kee
 | **debugger** | Finding the root cause of a bug or failing test, then fixing it with a regression check | Sonnet | Yes, never commits |
 
 A hook guards the read-only agents: they can write only inside their own memory folder.
+
+### Skills
+
+`skills/mainstay-blocks` records how a Mainstay CMS site's editor blocks are written and split: a class and a view per block, containers and items, nested allow-lists, parts for the header and footer, seeding and tests. Claude loads it when adding or changing blocks.
 
 ### Hooks
 
@@ -168,6 +174,7 @@ done
 If something is skipped, keep your own version and combine the two by hand:
 - For `CLAUDE.md`, add the line `@~/agentic-workflow/CLAUDE.md` to your file.
 - For a folder such as `agents/`, link the repo's files into it one at a time.
+- Skills go in `~/.claude/skills/`, which usually exists already: link each skill folder, e.g. `ln -s ~/agentic-workflow/skills/mainstay-blocks ~/.claude/skills/mainstay-blocks`.
 
 **3. Merge the settings**
 

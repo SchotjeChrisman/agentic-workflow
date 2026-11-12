@@ -12,6 +12,9 @@
 !hooks/*.sh
 !rules/
 !rules/*.md
+!skills/
+!skills/*/
+!skills/*/SKILL.md
 !.claude/
 !.claude/CLAUDE.md
 !.claude-plugin/
