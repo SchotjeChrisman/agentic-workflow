@@ -182,7 +182,7 @@ If something is skipped, keep your own version and combine the two by hand:
 **3. Merge the settings**
 
 `settings.json` is merged into yours, never copied over it:
-- your plugins, marketplaces, permission rules and hooks stay, and the repo's are added;
+- your plugins, marketplaces, permission rules and hooks stay, and the repo's are added (a hook whose command you already run is not added twice);
 - where both files set the same value (`theme`, say), yours wins;
 - if anything fails, your file is left untouched.
 
@@ -194,7 +194,9 @@ jq -s 'def m($a; $b):
     if ($a|type) == "object" and ($b|type) == "object" then reduce ($b|keys_unsorted[]) as $k ($a; .[$k] = m($a[$k]; $b[$k]))
     elif ($a|type) == "array" and ($b|type) == "array" then $a + ($b - $a)
     else $b end;
-  m(.[1]; .[0])' settings.json ~/agentic-workflow/settings.json > settings.json.new || rm -f settings.json.new
+  def one_per_command: reduce .[] as $h ([]; if any(.[]; .command == $h.command) then . else . + [$h] end);
+  def one_group_per_matcher: group_by(.matcher) | map((if .[0].matcher then {matcher: .[0].matcher} else {} end) + {hooks: (map(.hooks) | add | one_per_command)});
+  m(.[1]; .[0]) | if .hooks then .hooks |= map_values(one_group_per_matcher) else . end' settings.json ~/agentic-workflow/settings.json > settings.json.new || rm -f settings.json.new
 diff <(jq -S . settings.json) <(jq -S . settings.json.new)
 mv settings.json.new settings.json
 ```
