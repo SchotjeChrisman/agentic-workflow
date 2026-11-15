@@ -44,6 +44,7 @@ agentic-workflow/
 │   ├── learn.sh            memory caps, "worth keeping?" nudges, background review
 │   ├── peers.sh            tells Claude about other live sessions in the repo
 │   ├── rtk.sh              optional: compressed command output via rtk
+│   ├── herdr.sh            optional: background agents as herdr tabs
 │   └── test_*.sh           self-checks for each hook
 ├── mods/
 │   └── statusband/         status band above the prompt (a Claude Code mod)
@@ -100,6 +101,8 @@ A hook guards the read-only agents: they can write only inside their own memory 
 
 **`rtk.sh`: quieter output (optional).** When [rtk](https://github.com/rtk-ai/rtk) is installed, it routes the main session's Bash commands through rtk to compress their output. Diffs, subagent commands, and anything your `ask` or `deny` permission rules name are passed through untouched. Without rtk it does nothing. It assumes auto mode: rewritten read-only commands lose their built-in approval, so outside auto mode they prompt.
 
+**`herdr.sh`: herdr tabs (optional).** Inside [herdr](https://herdr.dev), the TUI or the desktop app, Claude runs what would be a background agent as a full `claude` session in a new tab of its own space, waits for it, reads its report and closes the tab. Tabs still open are closed when the session ends. Only tabs it opened are ever closed: it keeps a ledger in `~/.claude/herdr/`, and your own tabs are never in it. Outside herdr it does nothing.
+
 ### Status band
 
 `mods/statusband` is a Claude Code mod: a band of three rows drawn above the prompt, in place of a `statusLine` script.
@@ -146,7 +149,7 @@ It also:
 | **OS** | Linux, macOS or a BSD |
 | **Claude Code** | the `claude` CLI |
 | **Tools** | bash 3.2+, jq 1.7+, git, python3, awk, diff |
-| **Optional** | [rtk](https://github.com/rtk-ai/rtk) for compressed output; a [Nerd Font](https://www.nerdfonts.com) in your terminal for the status band's icons |
+| **Optional** | [rtk](https://github.com/rtk-ai/rtk) for compressed output; [herdr](https://herdr.dev) for agent tabs; a [Nerd Font](https://www.nerdfonts.com) in your terminal for the status band's icons |
 
 On macOS, the Xcode Command Line Tools provide git and python3, and macOS 15 and later ship jq 1.7.
 
@@ -216,7 +219,7 @@ The last two lines add your clone as a marketplace. Claude Code then reads the s
 **5. Check it**
 
 ```sh
-cd ~/agentic-workflow && bash hooks/test_learn.sh && bash hooks/test_peers.sh && bash hooks/test_rtk.sh
+cd ~/agentic-workflow && bash hooks/test_learn.sh && bash hooks/test_peers.sh && bash hooks/test_rtk.sh && bash hooks/test_herdr.sh
 ```
 
 Each test prints `PASS` (`test_rtk.sh` prints `SKIP` without rtk). Then start `claude`:
@@ -275,6 +278,7 @@ The tests run in a temporary sandbox and never touch your live config:
 bash hooks/test_learn.sh
 bash hooks/test_peers.sh
 bash hooks/test_rtk.sh
+bash hooks/test_herdr.sh
 claude plugin validate mods/statusband
 claude plugin test mods/statusband
 ```

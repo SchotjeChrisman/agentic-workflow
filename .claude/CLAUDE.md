@@ -22,6 +22,7 @@ No build or lint step. The tests:
 bash hooks/test_learn.sh    # ~6s, waits on detached reviewers
 bash hooks/test_peers.sh
 bash hooks/test_rtk.sh      # prints SKIP without rtk
+bash hooks/test_herdr.sh    # stub herdr and hc
 claude plugin validate mods/statusband
 claude plugin test mods/statusband
 ```
@@ -41,6 +42,8 @@ One script behind four hook events in `settings.json`, dispatched on `hook_event
 `hooks/peers.sh` (SessionStart) lists other live sessions from `~/.claude/sessions/*.json` in the same directory or git repo, and tells Claude to message them before editing shared files.
 
 `hooks/rtk.sh` (PreToolUse on Bash, main session only) hands commands to rtk so their output arrives compressed. Claude Code checks permission rules against the rewritten command, so anything matching a `Bash(...)` ask or deny rule in the user, project or local settings, plus `git diff` and `git show`, passes through untouched. A new ask or deny rule exempts its commands automatically. Subagents get raw output.
+
+`hooks/herdr.sh` (SessionStart, SessionEnd, plus `run|send|close` subcommands Claude calls) swaps background agents for tabs running `claude` inside herdr. It picks the TUI backend on `HERDR_ENV=1` (`herdr tab|agent` CLI) or the desktop one on `HC_TERMINAL_ID` with a `herdr.space` label on that terminal (`hc run --label herdr.space=<id>`; the app turns such a terminal into a tab and closes the tab when it ends). `herdr-app` itself is local-socket only, so it is not used. A per-pane ledger in `~/.claude/herdr/` is the only thing `close` and SessionEnd act on, which keeps user tabs untouched; SessionEnd skips `reason: clear`. Tab sessions carry `CLAUDE_HERDR_CHILD=1` and get no note, so they never nest. Like the other hooks it needs the settings merge before it runs live.
 
 ## agents/
 Five user-scope agents built around a method, not a stack. All run on Sonnet at medium effort except debugger (high) and scraper (Haiku, medium), set by `model` and `effort` in their frontmatter. They share one section layout (Orient, Method, Evidence, Running things, Memory, Report), keep `memory: user` under `~/.claude/agent-memory/<agent>/` with one MEMORY.md line per project titled by absolute path, and cap their report length. Only debugger edits. Because they are live, a trial `claude -p` run that keeps the real config dir (a `LEARN_HOME` sandbox, for one) and uses an agent writes into the real agent memory: afterwards remove that topic file, its MEMORY.md line and the sandbox transcript dirs.
