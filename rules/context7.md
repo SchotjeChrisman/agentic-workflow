@@ -1,12 +1,12 @@
 # Library docs
 
 Check third-party libraries, frameworks, SDKs, CLI tools and platform APIs against current docs with Context7, not memory:
-- before writing or changing code that uses an API, option or config key you haven't confirmed this session;
+- before writing or changing code that uses an API, option or config key Claude hasn't confirmed this session;
 - when an error, warning or deprecation names a library API ("deprecated", "does not contain a definition", "unknown option"), before working around it or calling it pre-existing;
 - when a plan or review depends on how a library behaves;
-- when I ask about one.
+- when Chris asks about one.
 
-Not for our own code, general programming concepts, or refactors that don't change library calls.
+Not for Chris's own code, general programming concepts, or refactors that don't change library calls.
 
 1. Version first: read the installed version from the lockfile or manifest.
 2. `resolve-library-id` with the package's official name as the manifest spells it. Check that the result's org and description belong to that vendor; if not, retry with another name. Use a version-specific ID when one matches step 1.
