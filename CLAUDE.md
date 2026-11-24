@@ -41,6 +41,14 @@ Claude writes or changes; code outside the ask stays as it is.
 - Never mention Claude, Claude Code, or Anthropic in a commit message, PR body, or branch name.
 - No `Co-Authored-By` line, no "Generated with" footer. Write it as Chris would.
 
+## Rule check
+A stage before the verifier, for changes where input handling, parsing, money or security is the risk, and whenever Chris asks. Skip it where the code has no runnable entry point.
+1. The `rule-writer` agent gets the request verbatim, the plan or design and the entry points, never the code, and returns candidate rules.
+2. Chris approves the rules one at a time with AskUserQuestion: approve, edit or drop. Claude saves the approved ones, unchanged, to `.claude/breaker-rules.md` in the project, with the date and the request they came from. Rules already there are reused; only new ones go to Chris.
+3. For each approved rule Claude starts `breaker` agents with different angles (boundaries, shape, state, hostile), giving each the rule, its entry point and how to run it safely, never the code.
+4. A BROKEN result is a finding: Claude fixes the code, re-runs that breaker, then goes on. A HELD result means no input broke the rule, never that it is proven.
+5. The verifier gets the rules file and the breaker results with the request and the diff.
+
 ## Before claiming done
 For non-trivial changes — real logic, multiple files, anything with a branch or a loop —
 never say "done", "fixed", or "works" until a fresh subagent verifies it. Claude gives it the

@@ -2,7 +2,7 @@
 
 # agentic-workflow
 
-**A stack-agnostic Claude Code setup: global rules, five method-driven subagents, self-improving memory hooks and a rate-limit-aware status band.**
+**A stack-agnostic Claude Code setup: global rules, seven method-driven subagents, self-improving memory hooks and a rate-limit-aware status band.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20BSD-lightgrey)
@@ -37,6 +37,8 @@ agentic-workflow/
 │   ├── critic.md           stress-tests a plan before it's built
 │   ├── auditor.md          checks docs or data against reality
 │   ├── scraper.md          researches the web and docs on Haiku
+│   ├── rule-writer.md      turns a request into rules the code must obey
+│   ├── breaker.md          tries to break one rule with input alone, on Haiku
 │   └── debugger.md         root-causes and fixes a bug
 ├── skills/
 │   └── mainstay-blocks/    how a Mainstay site's editor blocks are built and split
@@ -65,6 +67,7 @@ Your `~/.claude` links to the files in this repo, and Claude Code reads the stat
 - **Scope:** a plan or brainstorm means build nothing yet; numbered steps are the whole job.
 - **Code:** readable, modular code in the project's own conventions, built to grow without a rewrite but never for features nobody asked for.
 - **Commits:** small conventional commits, with no AI attribution lines.
+- **Rule check:** for input-heavy changes, an Opus agent drafts rules from the request, Chris approves each, and Haiku agents try to break them through input alone.
 - **Verify before "done":** every non-trivial change gets a fresh verifier subagent, with severity-ranked findings and at most three rounds.
 - **Models:** subagents and workflow stages get Haiku, Sonnet or the session's model by task, and web research goes to the scraper.
 - **Output:** dense plain reports and multiple-choice decisions, with no preamble or emoji.
@@ -73,7 +76,7 @@ Your `~/.claude` links to the files in this repo, and Claude Code reads the stat
 
 ### Subagents
 
-Five user-scope agents, each built around a method rather than a stack. Each keeps its own memory per project under `~/.claude/agent-memory/<agent>/`.
+Seven user-scope agents, each built around a method rather than a stack. Each except breaker keeps its own memory per project under `~/.claude/agent-memory/<agent>/`.
 
 | Agent | Use it for | Model | Edits code? |
 | --- | --- | --- | --- |
@@ -81,6 +84,8 @@ Five user-scope agents, each built around a method rather than a stack. Each kee
 | **critic** | Stress-testing a plan: false claims, failure modes, over- and under-built parts, test gaps | Sonnet | No |
 | **auditor** | Checking a document, list or dataset against reality, item by item | Sonnet | No |
 | **scraper** | Web and docs research: returns each fact as a verbatim quote with its URL, so the pages stay out of your context | Haiku | No |
+| **rule-writer** | Writing the rules finished code must obey, from the request and plan, for Chris to approve | Opus | No |
+| **breaker** | Trying to break one approved rule with inputs only, without reading the code | Haiku | No |
 | **debugger** | Finding the root cause of a bug or failing test, then fixing it with a regression check | Sonnet | Yes, never commits |
 
 A hook guards the read-only agents: they can write only inside their own memory folder.
@@ -226,7 +231,7 @@ cd ~/agentic-workflow && bash hooks/test_learn.sh && bash hooks/test_peers.sh &&
 
 Each test prints `PASS` (`test_rtk.sh` prints `SKIP` without rtk). Then start `claude`:
 - the status band appears above the prompt;
-- `/agents` lists verifier, critic, auditor, scraper and debugger;
+- `/agents` lists verifier, critic, auditor, scraper, rule-writer, breaker and debugger;
 - `/hooks` shows the hooks.
 
 ## Customizing
